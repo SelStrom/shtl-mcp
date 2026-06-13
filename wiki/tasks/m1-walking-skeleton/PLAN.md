@@ -15,7 +15,7 @@
 EditMode-тесты гоняются через Unity CLI (boot ~30–60 c) или интерактивно в **Window → General → Test Runner → EditMode**. Для CLI задайте путь к редактору и используйте сниппет:
 
 ```bash
-export UNITY="/Applications/Unity/Hub/Editor/2022.3.40f1/Unity.app/Contents/MacOS/Unity"   # подставьте свою 2022.3.x
+export UNITY="/Applications/Unity/Hub/Editor/2022.3.62f3/Unity.app/Contents/MacOS/Unity"   # проверено: batchmode+лицензия работают
 run_tests() {  # $1 = -testFilter значение (класс или метод)
   "$UNITY" -batchmode -runTests -projectPath "$(pwd)" \
     -testPlatform EditMode -testResults "$(pwd)/TestResults.xml" \
