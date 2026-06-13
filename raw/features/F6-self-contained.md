@@ -17,7 +17,8 @@ status: active
 - **AC6.3** — Единственный конфиг-след у клиента — запись `claude mcp add` (по
   умолчанию user-level `~/.claude.json`); project-level `.mcp.json` —
   документированная опция (хрупка при динамическом порте и worktrees).
-- **AC6.4** — Единственный файл вне проекта — реестр `~/.unity-mcp/registry.json`.
+- **AC6.4** — Файлы вне проекта — только в `~/.unity-mcp/`: реестр
+  `registry.json` и управляющие флаги `<serverName>.cmd` (control-channel).
 - **AC6.5** — Зависимости рантайма — только Newtonsoft.Json (UPM) + Unity Editor
   BCL. Никакого ASP.NET Core / официального тяжёлого MCP SDK.
 - **AC6.6** — Никаких окон/попапов, кроме единственного дашборда (= INV-4).

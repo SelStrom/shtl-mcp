@@ -15,3 +15,11 @@ dashboard}; CLAUDE.md (схема агента). Код ещё не написа
 мульти-инстанс через реестр + детерм. порт + префикс инструментов; watchdog +
 reconnect; тонкое ядро + run_csharp/execute_menu_item; UI Toolkit дашборд;
 Claude Code (итер.1), Unity 2022+; регистрация user-level.
+
+## [2026-06-13] forward | F2 control-flag recovery | discuss
+Добавлен LLM-инициируемый форс-рестарт: control-flag канал
+`~/.unity-mcp/<serverName>.cmd`, исполняемый watchdog'ом независимо от listener'а
+(работает, когда сервер недоступен; без демона; Unity не запускаем). Правки:
+raw F2 (AC2.6/AC2.7), raw/domain (Control channel + INV-5), raw F6 (AC6.4),
+wiki lifecycle (§4 Control-channel), wiki multi-instance (флаги в ~/.unity-mcp/),
+CLAUDE.md (§Recovery playbook).

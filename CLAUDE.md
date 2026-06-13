@@ -94,6 +94,25 @@ Greenfield — код ещё не написан. Заполнить по фак
 Runner / CLI `-runTests -testPlatform EditMode|PlayMode`, asmdef-структура из
 `wiki/systems/architecture.md`). **Не выдумывать команды, которых нет.**
 
+## Recovery playbook (восстановление MCP моделью)
+
+Для модели, **использующей** shtl-mcp, когда вызов MCP-инструмента падает
+(connection refused / таймаут):
+
+1. Bash: `cat ~/.unity-mcp/registry.json` → найти запись этого инстанса.
+2. Жив ли процесс Unity? `kill -0 <pid>` (или `ps -p <pid>`):
+   - **pid жив** (Unity работает, listener завис) → записать управляющий флаг:
+     `printf 'restart' > ~/.unity-mcp/<serverName>.cmd` → подождать ~2с →
+     `claude mcp` reconnect → повторить вызов.
+   - **pid мёртв** (Unity закрыт/упал) → восстановление вне зоны MCP: сообщить
+     человеку, чтобы открыл Unity (решение проекта: Unity моделью не запускаем).
+3. `reconnect` без живого сервера бесполезен — сначала поднять сервер (шаг 2),
+   потом переподключаться.
+
+При реализации этот playbook продублировать в подсказках ошибок инструментов и
+описании `status`, чтобы использующая модель видела его без доступа к репо
+(см. `wiki/systems/lifecycle-and-reload.md` §4).
+
 ## 9. Чего НЕ делать
 
 - НЕ менять intent-контент wiki в обход raw.
