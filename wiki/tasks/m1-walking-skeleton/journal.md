@@ -41,3 +41,31 @@ Append-only журнал исполнения. Режим: subagent-driven (св
 
 **Статус:** M1 реализован и верифицирован в headless-объёме; ветка `m1-walking-skeleton`
 готова к финальному ревью и приёмке.
+
+## [2026-06-13] Финальное ревью (opus) + правки
+
+**Вердикт:** READY TO MERGE (M1 scope). Critical — нет. Подтверждены: отсутствие
+self-deadlock (`RunOnMain` только с фонового HTTP-потока), идемпотентные подписки,
+guard двойного bind, atomic-запись реестра, чистота слоёв (Unity API только в
+Lifecycle/UI/log-hook).
+
+**Исправлено сразу (коммит `3f18ea5`):**
+- *Important #1* — `HttpServer.Start()` обёрнут в try/catch: если порт после reload
+  ещё в TIME_WAIT, сервер остаётся «не слушающим» (без исключения наружу watchdog'а),
+  порт не меняется, следующий тик повторит bind. В `ShtlMcpServer.EnsureStarted` —
+  guard `if (!_http.IsListening) { _http = null; return; }`, heartbeat только при успехе.
+- *Important #2* — добавлена подписка `AssemblyReloadEvents.afterAssemblyReload += Init`
+  (рядом с `delayCall`), сужает окно недоступности после reload; соответствует
+  контракту `lifecycle-and-reload.md` §1.
+- Регресс после правок: 34/34; повторный headless-смоук — happy-path цел.
+
+**M2-бэклог (приемлемо для M1, не блокеры):**
+- `ClientCount` — эвристика 0/1 (не различает ≥2 клиентов; curl-проба считается за
+  клиента). Сделать честный подсчёт активных сессий.
+- `Heartbeat()` глушит исключения молча → сбой записи реестра невидим при `health:ok`.
+  Логировать первый сбой в LogBuffer.
+- `RegistryStore.WriteAtomic` — гонка первого писателя между двумя инстансами
+  (низковероятна, самовосстанавливается).
+- DRY: `ProjectPath` дублируется в `EditorContext` и `ShtlMcpServer`.
+- Дашборд: глифы `●/○` могут не рендериться в части шрифтов редактора.
+- `JsonRpc.Result` не null-guard'ит `id` (безвредно — нотификации не доходят).
