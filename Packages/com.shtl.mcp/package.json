@@ -2,7 +2,28 @@
   "name": "com.shtl.mcp",
   "version": "0.1.0",
   "displayName": "Shtl MCP",
-  "description": "Self-contained in-Unity MCP server.",
+  "description": "Self-contained MCP (Model Context Protocol) server embedded in the Unity Editor — no external bridge process. Gives LLM agents (Claude Code etc.) HTTP/JSON-RPC control over the running Unity instance.",
   "unity": "2022.3",
-  "dependencies": { "com.unity.nuget.newtonsoft-json": "3.2.1" }
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "llm",
+    "ai",
+    "claude",
+    "editor",
+    "automation",
+    "tooling"
+  ],
+  "author": {
+    "name": "Andrey Shatalov",
+    "email": "asskunst@gmail.com",
+    "url": "https://github.com/SelStrom"
+  },
+  "license": "MIT",
+  "documentationUrl": "https://github.com/SelStrom/shtl-mcp",
+  "changelogUrl": "https://github.com/SelStrom/shtl-mcp/blob/main/Packages/com.shtl.mcp/CHANGELOG.md",
+  "licensesUrl": "https://github.com/SelStrom/shtl-mcp/blob/main/Packages/com.shtl.mcp/LICENSE.md",
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  }
 }

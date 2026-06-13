@@ -47,3 +47,10 @@ a7df6dd→799bf46). 34/34 EditMode-теста + headless HTTP smoke (initialize/
 tools.list/get_logs/registry) зелёные. Code-ref: wiki/code/m1-server.md (pin 799bf46).
 Детали и отклонения — wiki/tasks/m1-walking-skeleton/journal.md. Остаётся
 интерактивная приёмка: reload-survival в живом редакторе + claude mcp add в Claude Code.
+
+## [2026-06-13] forward | package as installable UPM | finish
+Оформлено как UPM-пакет (раскладка: пакет в Packages/com.shtl.mcp, install via git
+?path=/Packages/com.shtl.mcp — raw/wiki не протекают потребителю). Добавлены:
+package.json (author/license MIT/keywords/doc+changelog+license URLs), LICENSE.md,
+CHANGELOG.md (0.1.0/M1), README пакета (install/quick-start/tools), обновлён корневой
+README (структура репо + install). Unity-refresh подтвердил резолв пакета без ошибок.
