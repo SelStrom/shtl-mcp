@@ -40,3 +40,10 @@ manual для Unity-склейки). Декомпозиция проекта н�
 набор инструментов + async-job + control-flag), M3 (F7 discoverability + доводка UI).
 Локация планов — wiki/tasks/<slug>/PLAN.md (override дефолта skill'а под intent-driven
 фреймворк). Отклонение: M1 — один Editor-asmdef с папками (6-asmdef split → M2).
+
+## [2026-06-13] forward | M1 walking skeleton | wiki/tasks/m1-walking-skeleton
+Реализован вертикальный срез (subagent-driven, ветка m1-walking-skeleton, коммиты
+a7df6dd→799bf46). 34/34 EditMode-теста + headless HTTP smoke (initialize/status/
+tools.list/get_logs/registry) зелёные. Code-ref: wiki/code/m1-server.md (pin 799bf46).
+Детали и отклонения — wiki/tasks/m1-walking-skeleton/journal.md. Остаётся
+интерактивная приёмка: reload-survival в живом редакторе + claude mcp add в Claude Code.
