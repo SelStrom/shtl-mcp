@@ -67,6 +67,9 @@ art (CoderGamester/mcp-unity, IvanMurzak/Unity-MCP, CoplayDev/unity-mcp) и сж
 ## Контракт инструмента
 - JSON-схема параметров + человекочитаемое описание в `tools/list` (AC3.4).
 - Ответ всегда включает идентичность инстанса (`projectName`) (INV-3).
+- Ответ несёт `recoveryHint` со ссылкой на реестр (F7/AC7.3); `status` и
+  `initialize.instructions` содержат пре-брифинг восстановления (F7/AC7.2,
+  см. `recovery-discoverability.md`).
 - Ошибки — структурированные (понятный текст + код), не исключение наружу.
 
 ## v2 / опционально (достижимо через escape hatches)

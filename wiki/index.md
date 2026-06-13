@@ -12,6 +12,9 @@
   reload, async-job, watchdog, главный поток, Reload-Domain рекомендация.
 - [command-set](systems/command-set.md) — полный набор инструментов (тонкое ядро
   + escape hatches), async-команды, контракт, v2.
+- [recovery-discoverability](systems/recovery-discoverability.md) — как
+  использующая модель узнаёт о восстановлении (durable-реестр, пре-брифинг,
+  recoveryHint, opt-in host-крошка).
 - [dashboard](systems/dashboard.md) — UI Toolkit окно, макет, элементы.
 
 ## concepts/ — (пока пусто; intent-derived понятия по мере надобности)

@@ -109,9 +109,12 @@ Runner / CLI `-runTests -testPlatform EditMode|PlayMode`, asmdef-структу�
 3. `reconnect` без живого сервера бесполезен — сначала поднять сервер (шаг 2),
    потом переподключаться.
 
-При реализации этот playbook продублировать в подсказках ошибок инструментов и
-описании `status`, чтобы использующая модель видела его без доступа к репо
-(см. `wiki/systems/lifecycle-and-reload.md` §4).
+⚠️ Этот §Recovery — для **разработчика** shtl-mcp (видит этот репо). Использующая
+модель работает в host-проекте и dev-репо не видит — ей знание доставляется
+каналами F7: самоописываемый `~/.unity-mcp/registry.json` (блок `recovery`,
+durable), `initialize.instructions`, `recoveryHint` в ответах, опц. host-крошка
+с явного согласия. Механизм — `wiki/systems/recovery-discoverability.md`;
+мехника рестарта — `wiki/systems/lifecycle-and-reload.md` §4.
 
 ## 9. Чего НЕ делать
 

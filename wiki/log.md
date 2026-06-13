@@ -23,3 +23,13 @@ Claude Code (итер.1), Unity 2022+; регистрация user-level.
 raw F2 (AC2.6/AC2.7), raw/domain (Control channel + INV-5), raw F6 (AC6.4),
 wiki lifecycle (§4 Control-channel), wiki multi-instance (флаги в ~/.unity-mcp/),
 CLAUDE.md (§Recovery playbook).
+
+## [2026-06-13] forward | F7 recovery discoverability | discuss
+Закрыт вопрос «как использующая модель узнает о восстановлении» (она не видит
+dev-репо; при мёртвом сервере MCP-канал недоступен). Defense-in-depth по 3
+каналам + opt-in host-крошка. Решение cold-start: вариант A (строго
+самодостаточно по умолчанию) + предложение добавить указатель в host-CLAUDE.md
+или recovery-скилл только с явного согласия. Правки: новый raw F7; raw/domain
+INV-2 (исключение opt-in); raw F6 (AC6.1); raw F2 (AC2.7 cross-ref); новая wiki
+systems/recovery-discoverability; wiki index; wiki command-set (recoveryHint +
+пре-брифинг в контракте); CLAUDE.md §Recovery (две аудитории).
