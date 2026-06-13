@@ -1,8 +1,0 @@
-{
-  "name": "ShtlMcp.Editor",
-  "rootNamespace": "ShtlMcp",
-  "references": ["Newtonsoft.Json"],
-  "includePlatforms": ["Editor"],
-  "autoReferenced": true,
-  "noEngineReferences": false
-}

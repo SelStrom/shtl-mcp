@@ -14,19 +14,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **shtl-mcp** — лёгкий **самодостаточный** MCP-сервер, встроенный прямо в Unity
 Editor (без внешнего процесса-моста). Даёт LLM-агентам полноценный контроль над
-инстансом Unity. Намерение — в `raw/`, архитектура — в `wiki/systems/`.
+инстансом Unity. Намерение — в `.planning/raw/`, архитектура — в `.planning/wiki/systems/`.
 
 - Стек: C# only, Unity **2022 LTS+**, .NET Standard 2.1 / Mono, `HttpListener` +
   Newtonsoft.Json. Без Node/Python/ASP.NET Core/нативного кода.
 - Клиент итерации 1: **Claude Code**. HTTP-ядро клиент-агностично.
-- Жёсткие инварианты домена — `raw/domain/overview.md` (INV-1..INV-5). Перед
+- Жёсткие инварианты домена — `.planning/raw/domain/overview.md` (INV-1..INV-5). Перед
   изменениями свериться с ними.
 
 ## 2. Три артефакта и инварианты системы
 
-- **raw/** — источник истины о **намерении** (что и зачем). Меняется только через
+- **.planning/raw/** — источник истины о **намерении** (что и зачем). Меняется только через
   явные запросы.
-- **wiki/** — компилируемый слой: (а) верифицируемый gate между намерением и
+- **.planning/wiki/** — компилируемый слой: (а) верифицируемый gate между намерением и
   кодом, (б) дешёвый структурный контекст для операций над кодом.
 - **code** (`Assets/` / `Packages/`) — производное от намерения и объект
   наблюдения. Ground truth о **поведении**, но не авторитет о намерении.
@@ -44,7 +44,7 @@ wiki дёшево, на коде дорого).
 1. propose **raw-diff** (намерение).
 2. **Проверка консистентности** с существующим raw. Конфликт → СТОП, эскалация
    человеку (не решай сам, чьё намерение главнее).
-3. propose **wiki-diff** (обнови затронутые `wiki/systems/*`, `index.md`).
+3. propose **wiki-diff** (обнови затронутые `.planning/wiki/systems/*`, `index.md`).
 4. **Ревью человеком** — дешёвая точка контроля.
 5. generate **code-diff**.
 6. тесты / верификация.
@@ -57,17 +57,17 @@ wiki дёшево, на коде дорого).
 
 - Контекст бери **из wiki** (структурно, с cross-references), а не перечитывай
   тысячи строк кода.
-- Существенное изменение поведения → сначала предложи зафиксировать в `raw/`
+- Существенное изменение поведения → сначала предложи зафиксировать в `.planning/raw/`
   (пройти forward-поток). Детали реализации — свободно.
 
 ## 5. История тасков (additional проекта)
 
-Каждый таск → папка `wiki/tasks/<task-slug>/` (конвенция — `wiki/tasks/README.md`):
+Каждый таск → папка `.planning/wiki/tasks/<task-slug>/` (конвенция — `.planning/wiki/tasks/README.md`):
 `TASK.md` (цель, привязка к F1..F6 и системам, acceptance, шаги, статус) +
 append-only `journal.md` (ход, отклонения, решения, верификация).
 
-По завершении таска: обнови `wiki/index.md` (новые code-страницы) и допиши
-`wiki/log.md` строкой `## [дата] forward | <фича> | <task-slug>`.
+По завершении таска: обнови `.planning/wiki/index.md` (новые code-страницы) и допиши
+`.planning/wiki/log.md` строкой `## [дата] forward | <фича> | <task-slug>`.
 
 ## 6. Директива исследования (additional #1)
 
@@ -92,7 +92,7 @@ append-only `journal.md` (ход, отклонения, решения, вери
 
 Greenfield — код ещё не написан. Заполнить по факту появления (Unity Test
 Runner / CLI `-runTests -testPlatform EditMode|PlayMode`, asmdef-структура из
-`wiki/systems/architecture.md`). **Не выдумывать команды, которых нет.**
+`.planning/wiki/systems/architecture.md`). **Не выдумывать команды, которых нет.**
 
 ## Recovery playbook (восстановление MCP моделью)
 
@@ -113,8 +113,8 @@ Runner / CLI `-runTests -testPlatform EditMode|PlayMode`, asmdef-структу�
 модель работает в host-проекте и dev-репо не видит — ей знание доставляется
 каналами F7: самоописываемый `~/.unity-mcp/registry.json` (блок `recovery`,
 durable), `initialize.instructions`, `recoveryHint` в ответах, опц. host-крошка
-с явного согласия. Механизм — `wiki/systems/recovery-discoverability.md`;
-мехника рестарта — `wiki/systems/lifecycle-and-reload.md` §4.
+с явного согласия. Механизм — `.planning/wiki/systems/recovery-discoverability.md`;
+мехника рестарта — `.planning/wiki/systems/lifecycle-and-reload.md` §4.
 
 ## 9. Чего НЕ делать
 
@@ -122,5 +122,5 @@ durable), `initialize.instructions`, `recoveryHint` в ответах, опц. h
 - НЕ решать самому, чьё намерение главнее при конфликте — эскалация.
 - НЕ применять raw/wiki/code по частям при изменении поведения — атомарно.
 - НЕ считать детали реализации за drift — только функциональные расхождения.
-- НЕ нарушать INV-1..INV-5 (`raw/domain/overview.md`); если задача требует —
+- НЕ нарушать INV-1..INV-5 (`.planning/raw/domain/overview.md`); если задача требует —
   СТОП, обсудить с человеком.

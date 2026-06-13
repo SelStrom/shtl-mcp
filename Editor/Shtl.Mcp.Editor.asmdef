@@ -1,0 +1,8 @@
+{
+  "name": "Shtl.Mcp.Editor",
+  "rootNamespace": "Shtl.Mcp",
+  "references": ["Newtonsoft.Json"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true,
+  "noEngineReferences": false
+}

@@ -1,66 +1,77 @@
-# shtl-mcp
+# Shtl MCP
 
-Лёгкий **самодостаточный** MCP-сервер, встроенный прямо в Unity Editor — без
-внешнего процесса-моста. Даёт LLM-агентам (Claude Code и др.) контроль над
-инстансом Unity по HTTP/JSON-RPC.
+Self-contained **MCP (Model Context Protocol) server embedded in the Unity Editor** —
+no external bridge process, no Node/Python. Gives LLM agents (Claude Code and other
+MCP-over-HTTP clients) JSON-RPC control over the running Unity instance.
 
-> Статус: **M1 — Walking Skeleton** (`0.1.0`). Рабочий вертикальный срез: транспорт,
-> выживание при reload, мульти-инстанс, инструменты `status` / `get_logs`, дашборд.
+> Status: **M1 — Walking Skeleton** (`0.1.0`). Core transport + lifecycle + 2 tools.
+> See [CHANGELOG](CHANGELOG.md) for the roadmap.
 
-## Этот репозиторий
+## Requirements
+- Unity **2022.3 LTS** or newer.
+- `com.unity.nuget.newtonsoft-json` (pulled in automatically as a dependency).
+- Editor-only (the server runs in the Editor; nothing ships in player builds).
 
-Репо — **dev-проект Unity, в котором разрабатывается пакет**, плюс intent-driven
-документация. Сам пакет — embedded UPM в `Packages/com.shtl.mcp/`.
-
-```
-Packages/com.shtl.mcp/   ← ПАКЕТ (package.json, Editor/, Tests/, README, LICENSE, CHANGELOG)
-Assets/ ProjectSettings/ ← dev-проект Unity (для прогона EditMode-тестов)
-raw/  wiki/  CLAUDE.md    ← intent-driven docs (НЕ импортируются потребителю пакета)
-```
-
-## Установка пакета (UPM)
+## Install (UPM)
 
 Package Manager → **Add package from git URL…**:
 
 ```
-https://github.com/SelStrom/shtl-mcp.git#upm
+https://github.com/SelStrom/shtl-mcp.git
 ```
 
-Ветка `upm` — чистый корневой пакет (публикуется `git subtree` из dev-моно-репо
-`main`): импортируется только пакет, dev-проект и `raw/wiki` к потребителю не попадают.
-Подробности использования — [README пакета](Packages/com.shtl.mcp/README.md).
+or add to `Packages/manifest.json`:
 
-## Ключевые свойства
-- **Self-contained** — только Unity-пакет; ноль артефактов в папке LLM-клиента
-  (единственное касание — `claude mcp add`).
-- **Multi-instance** — каждый инстанс Unity = свой HTTP-сервер; адресация по
-  префиксу инструментов `mcp__unity-<project>__*`; реестр `~/.unity-mcp/registry.json`.
-- **Survives domain reload** — listener переживает перекомпиляцию и play/edit-переход
-  (watchdog + `SessionState` + re-spawn).
-- **UI Toolkit дашборд** — одно минимальное информационное окно (`Window/Shtl MCP`).
-
-## Разработка
-Открыть репозиторий как проект в Unity 2022.3+. Прогон тестов — см.
-[`wiki/tasks/m1-walking-skeleton/PLAN.md`](wiki/tasks/m1-walking-skeleton/PLAN.md)
-(«Соглашения по запуску тестов»). Текущая карта кода —
-[`wiki/code/m1-server.md`](wiki/code/m1-server.md).
-
-## Документация (intent-driven)
-- [`CLAUDE.md`](CLAUDE.md) — схема агента: флоу `raw → wiki → code`.
-- [`raw/`](raw/) — намерение (источник истины): домен, инварианты, фичи F1–F7.
-- [`wiki/`](wiki/) — архитектура и компилируемый контекст; начинать с
-  [`wiki/index.md`](wiki/index.md).
-
-## Релиз пакета (для мейнтейнеров)
-Ветка `upm` — это содержимое `Packages/com.shtl.mcp/`, нарезанное `git subtree`
-(канонический приём Unity: `package.json` в корне публикуемой ветки, install без
-`?path`). Публикация/обновление:
-
-```
-git branch -D upm 2>/dev/null
-git subtree split --prefix=Packages/com.shtl.mcp -b upm
-git push -f origin upm
+```json
+"com.shtl.mcp": "https://github.com/SelStrom/shtl-mcp.git"
 ```
 
-## Лицензия
-[MIT](Packages/com.shtl.mcp/LICENSE.md). Целевая платформа: Unity 2022 LTS+.
+The package lives at the repository root (canonical UPM layout), so only the package is
+imported — the dev/test project (`TestProject~/`) and planning docs (`.planning/`) are
+ignored by the Package Manager (folders suffixed `~` / prefixed `.`).
+
+## Quick start
+1. The server **auto-starts** when the Editor loads. Open **Window → Shtl MCP** for
+   the dashboard (status, port, and the exact connect command).
+2. Register it with your client. With Claude Code, copy the dashboard's command:
+   ```
+   claude mcp add --transport http unity-<project> http://127.0.0.1:<port>/mcp
+   ```
+   (The port is path-deterministic; the dashboard and `~/.unity-mcp/registry.json`
+   always show the live value.)
+3. Tools appear prefixed by the instance name, e.g. `mcp__unity-<project>__status`.
+
+## Multi-instance
+Each running Unity instance hosts its own server on its own port and registers in
+`~/.unity-mcp/registry.json`. The tool prefix (`unity-<project>`, de-duplicated by
+path hash for clones/worktrees) tells the model which instance a call targets.
+`cat ~/.unity-mcp/registry.json` lists all live instances and ports.
+
+## Tools (M1)
+| Tool | Description |
+|------|-------------|
+| `status` | Instance identity (project, path, version, port, pid), mode (edit/play), `isCompiling`, health. |
+| `get_logs` | Recent Unity console logs; filter by `minLevel` (info/warning/error) and `count`. |
+
+## Reliability
+The server survives script recompilation and play/edit transitions: the listener is
+cleanly stopped before a domain reload and re-spawned after (`[InitializeOnLoad]` +
+`AssemblyReloadEvents`), with the port persisted in `SessionState` and a per-second
+watchdog that re-binds if needed.
+
+## Development
+This repository **is** the package (canonical UPM layout: `package.json`, `Editor/`,
+`Tests/` at the root). The dev/test Unity project lives in `TestProject~/` and
+references the package via `file:../../` + `testables`. Run EditMode tests:
+
+```bash
+UNITY="/Applications/Unity/Hub/Editor/2022.3.62f3/Unity.app/Contents/MacOS/Unity"
+"$UNITY" -batchmode -nographics -runTests -projectPath "TestProject~" \
+  -testPlatform EditMode -testResults /tmp/results.xml -logFile -
+```
+
+Intent-driven planning docs (`raw`/`wiki`, see [`CLAUDE.md`](CLAUDE.md)) live in
+`.planning/` — ignored by UPM, not shipped to consumers.
+
+## License
+[MIT](LICENSE.md). Project home & docs: https://github.com/SelStrom/shtl-mcp
