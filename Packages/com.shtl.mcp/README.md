@@ -17,17 +17,18 @@ MCP-over-HTTP clients) JSON-RPC control over the running Unity instance.
 Package Manager → **Add package from git URL…**:
 
 ```
-https://github.com/SelStrom/shtl-mcp.git?path=/Packages/com.shtl.mcp
+https://github.com/SelStrom/shtl-mcp.git#upm
 ```
 
 or add to `Packages/manifest.json`:
 
 ```json
-"com.shtl.mcp": "https://github.com/SelStrom/shtl-mcp.git?path=/Packages/com.shtl.mcp"
+"com.shtl.mcp": "https://github.com/SelStrom/shtl-mcp.git#upm"
 ```
 
-The `?path=` query installs only this package folder — the development project and
-planning docs in the repo are not imported.
+The `upm` branch is a clean, root-level package (published via `git subtree` from the
+development mono-repo on `main`), so only the package is imported — no dev project or
+planning docs.
 
 ## Quick start
 1. The server **auto-starts** when the Editor loads. Open **Window → Shtl MCP** for

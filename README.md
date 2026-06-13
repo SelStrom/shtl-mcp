@@ -23,11 +23,12 @@ raw/  wiki/  CLAUDE.md    ← intent-driven docs (НЕ импортируютс�
 Package Manager → **Add package from git URL…**:
 
 ```
-https://github.com/SelStrom/shtl-mcp.git?path=/Packages/com.shtl.mcp
+https://github.com/SelStrom/shtl-mcp.git#upm
 ```
 
-`?path=` импортирует только папку пакета — dev-проект и доки не попадают в проект
-потребителя. Подробности использования — [README пакета](Packages/com.shtl.mcp/README.md).
+Ветка `upm` — чистый корневой пакет (публикуется `git subtree` из dev-моно-репо
+`main`): импортируется только пакет, dev-проект и `raw/wiki` к потребителю не попадают.
+Подробности использования — [README пакета](Packages/com.shtl.mcp/README.md).
 
 ## Ключевые свойства
 - **Self-contained** — только Unity-пакет; ноль артефактов в папке LLM-клиента
@@ -49,6 +50,17 @@ https://github.com/SelStrom/shtl-mcp.git?path=/Packages/com.shtl.mcp
 - [`raw/`](raw/) — намерение (источник истины): домен, инварианты, фичи F1–F7.
 - [`wiki/`](wiki/) — архитектура и компилируемый контекст; начинать с
   [`wiki/index.md`](wiki/index.md).
+
+## Релиз пакета (для мейнтейнеров)
+Ветка `upm` — это содержимое `Packages/com.shtl.mcp/`, нарезанное `git subtree`
+(канонический приём Unity: `package.json` в корне публикуемой ветки, install без
+`?path`). Публикация/обновление:
+
+```
+git branch -D upm 2>/dev/null
+git subtree split --prefix=Packages/com.shtl.mcp -b upm
+git push -f origin upm
+```
 
 ## Лицензия
 [MIT](Packages/com.shtl.mcp/LICENSE.md). Целевая платформа: Unity 2022 LTS+.

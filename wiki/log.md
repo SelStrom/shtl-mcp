@@ -54,3 +54,11 @@ tools.list/get_logs/registry) зелёные. Code-ref: wiki/code/m1-server.md (
 package.json (author/license MIT/keywords/doc+changelog+license URLs), LICENSE.md,
 CHANGELOG.md (0.1.0/M1), README пакета (install/quick-start/tools), обновлён корневой
 README (структура репо + install). Unity-refresh подтвердил резолв пакета без ошибок.
+
+## [2026-06-13] forward | canonical UPM layout: upm-branch via subtree | finish
+Сверка с каноном Unity (Package layout: package.json в корне пакета; Git install:
+корень по умолчанию, ?path — fallback). Принят канонический приём для dev-моно-репо:
+ветка `upm` = `git subtree split --prefix=Packages/com.shtl.mcp`. main остаётся
+dev-моно-репо (проект+пакет+raw/wiki, тестируется), потребитель ставит чистый
+`shtl-mcp.git#upm` без ?path и без протечки доков. Install-инструкции в обоих README
+переведены на #upm; в корневой README добавлена секция «Релиз пакета».
