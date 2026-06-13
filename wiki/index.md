@@ -25,6 +25,8 @@
 
 ## tasks/ — история тасков
 - [README](tasks/README.md) — конвенция ведения истории тасков.
+- [m1-walking-skeleton](tasks/m1-walking-skeleton/TASK.md) — вертикальный срез:
+  connect + status/get_logs + выживание при reload. План — `PLAN.md` (13 задач, TDD).
 
 ## Карта намерения (raw/)
 - `raw/domain/overview.md` — сущности, инварианты INV-1..5, ограничения.

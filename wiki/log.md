@@ -33,3 +33,10 @@ dev-репо; при мёртвом сервере MCP-канал недосту
 INV-2 (исключение opt-in); raw F6 (AC6.1); raw F2 (AC2.7 cross-ref); новая wiki
 systems/recovery-discoverability; wiki index; wiki command-set (recoveryHint +
 пре-брифинг в контракте); CLAUDE.md §Recovery (две аудитории).
+
+## [2026-06-13] plan | M1 walking skeleton | wiki/tasks/m1-walking-skeleton
+Написан bite-sized план реализации (13 задач, TDD для чистой логики, integration/
+manual для Unity-склейки). Декомпозиция проекта на вехи: M1 (этот срез), M2 (полный
+набор инструментов + async-job + control-flag), M3 (F7 discoverability + доводка UI).
+Локация планов — wiki/tasks/<slug>/PLAN.md (override дефолта skill'а под intent-driven
+фреймворк). Отклонение: M1 — один Editor-asmdef с папками (6-asmdef split → M2).
