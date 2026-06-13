@@ -21,6 +21,9 @@ namespace ShtlMcp.Lifecycle
             AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeReload;
             AssemblyReloadEvents.beforeAssemblyReload += OnBeforeReload;
 
+            AssemblyReloadEvents.afterAssemblyReload -= Init;
+            AssemblyReloadEvents.afterAssemblyReload += Init;
+
             EditorApplication.update -= Tick;
             EditorApplication.update += Tick;
         }

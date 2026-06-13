@@ -78,6 +78,12 @@ namespace ShtlMcp.Lifecycle
 
             _http = new HttpServer(Port, router.Handle, () => _lastRequestUtc = DateTime.UtcNow);
             _http.Start();
+            if (!_http.IsListening)
+            {
+                // bind не удался (порт ещё занят) — сбрасываем, watchdog повторит на следующем тике
+                _http = null;
+                return;
+            }
             Heartbeat();
         }
 

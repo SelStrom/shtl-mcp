@@ -27,9 +27,21 @@ namespace ShtlMcp.Server
             {
                 return;
             }
-            _listener = new HttpListener();
-            _listener.Prefixes.Add($"http://127.0.0.1:{Port}/");
-            _listener.Start();
+            try
+            {
+                _listener = new HttpListener();
+                _listener.Prefixes.Add($"http://127.0.0.1:{Port}/");
+                _listener.Start();
+            }
+            catch
+            {
+                // порт ещё не освобождён предыдущим доменом (TIME_WAIT) или занят — оставляем
+                // сервер незапущенным; watchdog повторит на следующем тике, порт не меняем.
+                try { _listener?.Close(); } catch { }
+                _listener = null;
+                _running = false;
+                return;
+            }
             _running = true;
             _thread = new Thread(Loop) { IsBackground = true, Name = "ShtlMcpHttp" };
             _thread.Start();
