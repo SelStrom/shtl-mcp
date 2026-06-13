@@ -1,6 +1,6 @@
 # TASK: M1 — Walking Skeleton
 
-**Status:** planned
+**Status:** done (headless-верифицирован; интерактивная приёмка reload + `claude mcp add` — за пользователем)
 **Привязка:** raw F1 (multi-instance), F2 (restart/watchdog), F3 (часть: status/get_logs),
 F4 (play/edit + reload), F5 (минимальный дашборд), F6 (self-contained).
 Системы: `wiki/systems/{architecture, multi-instance, lifecycle-and-reload, command-set, dashboard}.md`.
