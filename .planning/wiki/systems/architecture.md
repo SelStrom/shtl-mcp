@@ -55,16 +55,23 @@ Claude Code ──Streamable HTTP (JSON-RPC 2.0)──▶ HttpListener  (фон�
 - Без Node/Python, без ASP.NET Core, без нативных бинарей, без внешних процессов.
 
 ## Модульность (asmdef — изоляция и тестируемость)
-Каждая сборка — одна ответственность, тестируется отдельно:
+Каждая сборка — одна ответственность, тестируется отдельно. **Реализовано** (таск `m2-asmdef-split`):
+6 Editor-only asmdef под папками `Editor/<сборка>/`. namespace'ы исторические (`Shtl.Mcp.Dispatch/Jobs/
+Logging/Common/Server` живут внутри новых сборок — папка ≠ namespace).
 
-| asmdef | Ответственность | Ключевые зависимости |
-|---|---|---|
-| `ShtlMcp.Transport` | HttpListener + парсер/сериализатор JSON-RPC, маршрутизация MCP-методов | Newtonsoft (без Unity, где можно → юнит-тестируемо вне Editor) |
-| `ShtlMcp.Dispatcher` | Очередь команд, исполнение в главном потоке, JobStore (SessionState) | UnityEditor |
-| `ShtlMcp.Registry` | Чтение/запись `~/.unity-mcp/registry.json`, heartbeat, выбор порта, дедуп serverName | UnityEditor |
-| `ShtlMcp.Tools` | Реестр инструментов (`[McpTool]`), реализации Core-команд | UnityEditor |
-| `ShtlMcp.Lifecycle` | `InitializeOnLoad`, `AssemblyReloadEvents`, watchdog, авто-старт | UnityEditor |
-| `ShtlMcp.UI` | Дашборд (UI Toolkit `EditorWindow`) | UnityEditor + UIToolkit |
+| asmdef | Ответственность | Содержит (namespace) | references |
+|---|---|---|---|
+| `Shtl.Mcp.Transport` | HttpListener + парсер/сериализатор JSON-RPC, маршрутизация MCP-методов | JsonRpc/ServerInfo, McpRouter, IToolInvoker (`Transport`); HttpServer (`Server`) | Newtonsoft |
+| `Shtl.Mcp.Dispatcher` | Очередь команд, исполнение в главном потоке, JobStore (SessionState), LogBuffer | MainThreadDispatcher (`Dispatch`); Job/JobStore (`Jobs`); LogBuffer/LogLevel (`Logging`) | Newtonsoft |
+| `Shtl.Mcp.Registry` | `~/.unity-mcp/registry.json`, heartbeat, выбор порта, дедуп serverName | InstanceEntry/RegistryStore (`Registry`); Fnv/PortAllocator/ServerName (`Common`) | Newtonsoft |
+| `Shtl.Mcp.Tools` | Реестр инструментов, реализации Core-команд, no-throttle | все тулы + ITool/IEditorContext/ToolRegistry/TestRunnerNoThrottle (`Tools`) | Dispatcher, Newtonsoft, *.TestRunner |
+| `Shtl.Mcp.Lifecycle` | `InitializeOnLoad`, `AssemblyReloadEvents`, watchdog, авто-старт, композиция | EditorContext/ShtlMcpServer/Bootstrap/Config (`Lifecycle`); DispatchingToolInvoker (`Server`) | Registry, Dispatcher, Transport, Tools, Newtonsoft |
+| `Shtl.Mcp.UI` | Дашборд (UI Toolkit `EditorWindow`) | DashboardWindow (`UI`) | Lifecycle |
+
+DAG: Transport/Dispatcher/Registry — листья; Tools→Dispatcher; Lifecycle→{Registry,Dispatcher,Transport,
+Tools}; UI→Lifecycle. **Разрыв цикла Lifecycle↔Tools** (Unity запрещает циклы): `TestRunCallbacks`
+получает `JobStore` через DI, а не `ShtlMcpServer.Instance` (убрано ребро Tools→Lifecycle); `Logging`
+размещён в Dispatcher (а не Lifecycle), чтобы GetLogsTool читал LogBuffer без захода в Lifecycle.
 
 ## Стратегия тестирования
 - EditMode-тесты: парсер/роутер JSON-RPC, выбор порта и дедуп `serverName`,

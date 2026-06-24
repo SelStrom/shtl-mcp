@@ -29,6 +29,45 @@
 - [README](tasks/README.md) — конвенция ведения истории тасков.
 - [m1-walking-skeleton](tasks/m1-walking-skeleton/TASK.md) — вертикальный срез:
   connect + status/get_logs + выживание при reload. План — `PLAN.md` (13 задач, TDD).
+- [m1-reload-survival-test](tasks/m1-reload-survival-test/TASK.md) — автотест reload-survival
+  (RED-gate): EditMode `[UnityTest]` через `WaitForDomainReload` + watchdog re-bind; `status`
+  round-trip как проба. Закрывает интерактивную приёмку reload из m1-walking-skeleton.
+- [status-reload-observability](tasks/status-reload-observability/TASK.md) — наблюдаемость re-spawn
+  в `status`: `reloadCount` (durable) + `listenerUptimeSeconds` (сброс при re-spawn). Forward-поток
+  F4/AC4.7 (raw+wiki+code).
+- [reload-respawn-focus-independent](tasks/reload-respawn-focus-independent/TASK.md) — bugfix INV-5:
+  re-spawn после reload через afterAssemblyReload в InitializeOnLoad (focus-independent). Плюс MCP
+  `recompile`-инструмент → автономная дев-петля (edit → recompile → self-recovery).
+- [m2-async-job](tasks/m2-async-job/TASK.md) — T1: JobStore (переживает reload) + `get_job`.
+  Фундамент async-job для reload-инструментов и run_tests.
+- [m2-run-tests](tasks/m2-run-tests/TASK.md) — T7: `run_tests` (job+polling) + no-throttle
+  (`TestRunnerNoThrottle`, двухслойный бэкап) + orphan-таймаут + reload-spanning (изоляция ключа JobStore).
+  Self-test полностью рабочий (полный сьют headless, переживает reload, сервер отзывчив).
+- [m2-asmdef-split](tasks/m2-asmdef-split/TASK.md) — T2: единый Editor-asmdef → 6 сборок
+  (Transport/Dispatcher/Registry/Tools/Lifecycle/UI), разрыв цикла Lifecycle↔Tools (DI JobStore +
+  Logging→Dispatcher). Характеризация 52/52 + reload-spanning зелёные.
+- [m2-play-recompile](tasks/m2-play-recompile/TASK.md) — T3: `recompile` (job) + `set_play_mode` через
+  обобщённый `ReloadJobs` (durable-маркер + финализация после reload). E2E: результат job доставлен
+  после самотриггернутого reload. 59/59.
+- [m2-assets](tasks/m2-assets/TASK.md) — T4: `clear_logs`, `refresh_assets` (job), find/read/move/delete
+  ассетов + create_folder (AssetDatabase CRUD). 63/63 + e2e round-trip.
+- [m2-prefabs](tasks/m2-prefabs/TASK.md) — T5: create/open/save/close/instantiate prefab (PrefabUtility +
+  prefab-stage). 66/66 + round-trip на реальном PrefabUtility.
+- [m2-scene-objects](tasks/m2-scene-objects/TASK.md) — T6: иерархия/GameObjects (create/modify/destroy/
+  set_parent/find/hierarchy) + scene/selection/SerializedObject (get/modify_object, open/save_scene,
+  get/set_selection). 72/72.
+- [m2-screenshot](tasks/m2-screenshot/TASK.md) — T9: `screenshot(view=game|scene)` как MCP image-content;
+  router-конвенция `_content`. 73/73.
+- [m2-config](tasks/m2-config/TASK.md) — T11: бэкенд конфига (EditorPrefs: port range, heartbeat, footgun
+  AllowRunCsharp), `get_config`. 76/76.
+- [m2-escape-hatches](tasks/m2-escape-hatches/TASK.md) — T8: `execute_menu_item`, `run_csharp` (footgun,
+  gated; CodeDom-компиляция). 79/79.
+- [m2-control-flag](tasks/m2-control-flag/TASK.md) — T10: watchdog исполняет `.cmd`-флаг (`restart`,
+  AC2.6) + `status.recovery` (AC2.7). E2E.
+
+## Планы вех
+- [m2-plan](m2-plan.md) — декомпозиция M2 (полный тулсет + async-job + control-flag + config +
+  asmdef split) на bite-sized таски T1–T11 с зависимостями и порядком волн.
 
 ## Карта намерения (raw/)
 - `raw/domain/overview.md` — сущности, инварианты INV-1..5, ограничения.

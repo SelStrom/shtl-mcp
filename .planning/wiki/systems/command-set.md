@@ -25,7 +25,7 @@ art (CoderGamester/mcp-unity, IvanMurzak/Unity-MCP, CoplayDev/unity-mcp) и сж
 ### Контроль и идентичность
 | Инструмент | Назначение |
 |---|---|
-| `status` | Идентичность инстанса (projectName/path/version/port/pid), mode, isCompiling, health. Якорь «какой инстанс + жив ли». |
+| `status` | Идентичность инстанса (projectName/path/version/port/pid), mode, isCompiling, health, uptimeSeconds. Якорь «какой инстанс + жив ли». Наблюдаемость re-spawn (F4/AC4.7): `reloadCount` (пережитых domain reload за сессию, durable) + `listenerUptimeSeconds` (время текущего listener'а, сбрасывается при re-spawn). |
 | `set_play_mode(playing)` ⏳ | Войти/выйти из Play. |
 | `recompile` ⏳ | Принудительная перекомпиляция скриптов. |
 | `get_job(jobId)` | Опрос статуса/результата async-job. |
