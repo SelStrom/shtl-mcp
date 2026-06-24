@@ -11,6 +11,8 @@ namespace Shtl.Mcp.Tools
         bool IsPlaying { get; }
         bool IsCompiling { get; }
         double UptimeSeconds { get; }
+        double ListenerUptimeSeconds { get; }
+        int ReloadCount { get; }
         int ClientCount { get; }
     }
 }

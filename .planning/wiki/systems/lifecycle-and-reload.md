@@ -27,6 +27,12 @@ Domain; CoplayDev имеет баг утечки TcpListener после reload).
 - Состояние (выбранный порт, флаг «сервер должен работать», активные jobs) — в
   `SessionState` (переживает domain reload в пределах сессии Editor).
 - Окно недоступности ~секунды — клиент ретраит; это допустимо.
+- **Наблюдаемость re-spawn (AC4.7).** `beforeAssemblyReload` инкрементит durable
+  `reloadCount` (`SessionState`); каждый успешный re-spawn (`EnsureStarted`) ставит
+  свежий `listenerUptimeSeconds` (in-domain, не persisted → естественно сбрасывается).
+  Оба — в `status`. Durable `uptimeSeconds` (от `StartedTicks`, ставится раз за
+  сессию) один re-spawn не отличает; новые счётчики делают reload/rebind видимыми
+  по live-каналу и фальсифицируемыми вручную.
 
 ## 2. Async-job модель (для долгих/reload-команд)
 Команды, которые сами триггерят reload или идут долго, **нельзя** ждать на одном
@@ -40,6 +46,16 @@ HTTP-соединении (домен умрёт вместе с запросо�
   в JobStore.
 - Модель опрашивает `get_job(jobId)` → `running | done | failed` + payload/ошибки.
 - Идемпотентность: `get_job` по неизвестному id → понятная ошибка, не падение.
+
+**Focus-throttle во время прогонов (`run_tests`).** Unfocused Unity троттлит editor update → тест-прогон
+ползёт, главный поток голодает, async-опрос (`status`/`get_job`) висит всю длительность. Снимается
+`TestRunnerNoThrottle` (паттерн CoplayDev): на время прогона `EditorPrefs ApplicationIdleTime=0` +
+`InteractionMode=1`, впечатанные приватным `EditorApplication.UpdateInteractionModeSettings()`. Бэкап
+исходных значений — **двухслойный**: `SessionState` (переживает reload) + marker-файл в `Library/`
+(переживает краш — `EditorPrefs` durable, иначе редактор остаётся в no-throttle навсегда). Restore — в
+`RunFinished`; `RecoverOnLoad` при reload держит full-rate для in-flight прогона и откатывает осиротевший
+снимок. Orphan-таймаут (зависший running-job → авто-fail + restore) — с тика watchdog. Реализация —
+`Editor/Tools/{TestRunnerNoThrottle,RunTestsTool,TestRunCallbacks}.cs`; механика — `tasks/m2-run-tests/`.
 
 ## 3. Рекомендация Enter Play Mode → Reload Domain OFF
 - Отключение Reload Domain убирает domain reload при входе в Play (главный
@@ -82,6 +98,9 @@ Watchdog — единственный всегда-живой компонент
   Play) при вызове в неподходящем режиме → понятная ошибка в ответе, не краш.
 
 ## Точки верификации
-- PlayMode-тест: соединение/job переживают play→edit-переход (RED без механизма 1–2).
-- EditMode-тест: JobStore сериализуется/восстанавливается через эмулированный
-  reload (`SessionState` round-trip).
+- **Реализован** (EditMode `[UnityTest]`, таск `m1-reload-survival-test`): листенер переживает
+  форсированный domain reload (`EditorUtility.RequestScriptReload` + `WaitForDomainReload`) и
+  watchdog-rebind (`StopListenerForReload` + `WatchdogTick`) — проба `status` round-trip на том же
+  порту. RED-gate подтверждён (без механизма 1 / без watchdog-ветки оба теста краснеют).
+- **M2** (jobs): соединение/job переживают play→edit-переход; JobStore сериализуется/восстанавливается
+  через эмулированный reload (`SessionState` round-trip).

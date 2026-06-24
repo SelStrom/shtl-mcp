@@ -29,6 +29,14 @@ status: active
   контексте, возвращают понятную ошибку, а не падают.
 - **AC4.6** — Unity API вызывается **только** в главном потоке (через Dispatcher);
   фоновый HTTP-поток никогда не трогает Unity API напрямую.
+- **AC4.7** — Re-spawn **наблюдаем** через `status`: поля `reloadCount` (число
+  пережитых domain reload за сессию Unity; durable в `SessionState`) и
+  `listenerUptimeSeconds` (время жизни текущего listener-инстанса; сбрасывается при
+  каждом re-spawn — reload / watchdog-rebind / форс-рестарт). Дополняют durable
+  `uptimeSeconds` (логическое время инстанса). Делают AC4.1/INV-5 верифицируемыми и
+  по live-каналу, а не только тестом (durable `uptimeSeconds` один re-spawn не
+  отличает). Разница сигналов различает reload (растёт `reloadCount` + сброс
+  `listenerUptimeSeconds`) и watchdog-rebind (только сброс `listenerUptimeSeconds`).
 
 ## Out of scope
 - Нативный (C) прокси, переживающий reload (отвергнут ради лёгкости).

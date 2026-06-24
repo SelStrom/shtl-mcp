@@ -69,3 +69,8 @@ Lifecycle/UI/log-hook).
 - DRY: `ProjectPath` дублируется в `EditorContext` и `ShtlMcpServer`.
 - Дашборд: глифы `●/○` могут не рендериться в части шрифтов редактора.
 - `JsonRpc.Result` не null-guard'ит `id` (безвредно — нотификации не доходят).
+
+## [2026-06-14] приёмка reload | автоматизирована
+Оставшийся пункт «интерактивная приёмка reload — за пользователем» закрыт автоматически в таске
+`m1-reload-survival-test`: EditMode `[UnityTest]` RED-gate на domain-reload + watchdog re-bind.
+Остаётся только `claude mcp add` в живом Claude Code (подтверждено по факту использования).

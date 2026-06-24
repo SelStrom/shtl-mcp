@@ -1,10 +1,13 @@
 using System;
 using System.Net;
 using System.Net.Sockets;
+using Newtonsoft.Json.Linq;
 using UnityEditor;
+using UnityEditor.Compilation;
 using UnityEngine;
 using Shtl.Mcp.Common;
 using Shtl.Mcp.Dispatch;
+using Shtl.Mcp.Jobs;
 using Shtl.Mcp.Logging;
 using Shtl.Mcp.Registry;
 using Shtl.Mcp.Server;
@@ -20,18 +23,21 @@ namespace Shtl.Mcp.Lifecycle
 
         const string PortKey = "Shtl.Mcp.Port";
         const string StartedKey = "Shtl.Mcp.StartedTicks";
+        const string ReloadCountKey = "Shtl.Mcp.ReloadCount";
         static readonly TimeSpan Ttl = TimeSpan.FromSeconds(30);
         static readonly string RegistryPath = System.IO.Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".unity-mcp", "registry.json");
 
         readonly MainThreadDispatcher _dispatcher = new MainThreadDispatcher();
         readonly LogBuffer _logs = new LogBuffer(500);
+        readonly JobStore _jobs = new JobStore();
         readonly ToolRegistry _tools = new ToolRegistry();
         readonly RegistryStore _registry = new RegistryStore(RegistryPath);
 
         HttpServer _http;
         string _serverName;
         DateTime _lastRequestUtc = DateTime.MinValue;
+        DateTime _listenerStartedUtc = DateTime.MinValue;
 
         public int Port { get; private set; }
         public string ServerName => _serverName;
@@ -40,6 +46,17 @@ namespace Shtl.Mcp.Lifecycle
         string ProjectPath => System.IO.Directory.GetParent(Application.dataPath).FullName;
         double Uptime => (DateTime.UtcNow - new DateTime(long.Parse(
             SessionState.GetString(StartedKey, DateTime.UtcNow.Ticks.ToString())), DateTimeKind.Utc)).TotalSeconds;
+
+        // Время жизни текущего listener-инстанса: сбрасывается при каждом re-spawn (in-domain, не persisted).
+        double ListenerUptime => _listenerStartedUtc == DateTime.MinValue
+            ? 0
+            : (DateTime.UtcNow - _listenerStartedUtc).TotalSeconds;
+
+        // Durable-счётчик пережитых domain reload за сессию Unity (SessionState).
+        int ReloadCount => SessionState.GetInt(ReloadCountKey, 0);
+
+        /// Инкремент durable reloadCount. Вызывается из beforeAssemblyReload (до StopListenerForReload).
+        public void NoteReloadStarting() => SessionState.SetInt(ReloadCountKey, SessionState.GetInt(ReloadCountKey, 0) + 1);
 
         public void EnsureStarted()
         {
@@ -63,9 +80,54 @@ namespace Shtl.Mcp.Lifecycle
             EditorApplication.update -= _dispatcher.Drain;
             EditorApplication.update += _dispatcher.Drain;
 
-            var ctx = new EditorContext(() => Port, () => _serverName, () => Uptime, ClientCount);
+            var ctx = new EditorContext(() => Port, () => _serverName, () => Uptime, ClientCount,
+                () => ListenerUptime, () => ReloadCount);
             _tools.Register(new StatusTool(ctx));
             _tools.Register(new GetLogsTool(_logs));
+            _tools.Register(new RecompileTool(_jobs, () => ReloadCount));
+            _tools.Register(new SetPlayModeTool(_jobs, () => ReloadCount));
+            _tools.Register(new GetJobTool(_jobs));
+            _tools.Register(new RunTestsTool(_jobs));
+            _tools.Register(new ClearLogsTool(_logs));
+            _tools.Register(new RefreshAssetsTool(_jobs, () => ReloadCount));
+            _tools.Register(new FindAssetsTool());
+            _tools.Register(new ReadAssetTool());
+            _tools.Register(new MoveAssetTool());
+            _tools.Register(new DeleteAssetTool());
+            _tools.Register(new CreateFolderTool());
+            _tools.Register(new CreatePrefabTool());
+            _tools.Register(new OpenPrefabTool());
+            _tools.Register(new SavePrefabTool());
+            _tools.Register(new ClosePrefabTool());
+            _tools.Register(new InstantiatePrefabTool());
+            _tools.Register(new GetHierarchyTool());
+            _tools.Register(new FindGameObjectTool());
+            _tools.Register(new GameObjectCreateTool());
+            _tools.Register(new GameObjectModifyTool());
+            _tools.Register(new GameObjectDestroyTool());
+            _tools.Register(new SetParentTool());
+            _tools.Register(new GetObjectTool());
+            _tools.Register(new ModifyObjectTool());
+            _tools.Register(new OpenSceneTool());
+            _tools.Register(new SaveSceneTool());
+            _tools.Register(new GetSelectionTool());
+            _tools.Register(new SetSelectionTool());
+            _tools.Register(new ScreenshotTool());
+            _tools.Register(new GetConfigTool(ConfigSnapshot));
+            _tools.Register(new ExecuteMenuItemTool());
+            _tools.Register(new RunCsharpTool(() => ShtlMcpConfig.AllowRunCsharp));
+            TestRunCallbacks.ReattachIfPending(_jobs); // переподписка на in-flight прогон после domain reload
+
+            // reload-job (recompile/set_play_mode) финализируются после reload: копим ошибки компиляции
+            // и завершаем set_play_mode по достижению режима. Подписки переустанавливаются на каждой загрузке.
+            CompilationPipeline.assemblyCompilationFinished -= ReloadJobs.OnAssemblyCompiled;
+            CompilationPipeline.assemblyCompilationFinished += ReloadJobs.OnAssemblyCompiled;
+            EditorApplication.playModeStateChanged -= OnPlayModeChanged;
+            EditorApplication.playModeStateChanged += OnPlayModeChanged;
+            // Восстановить no-throttle: in-flight прогон → держим full-rate; иначе откатить осиротевший
+            // снимок (краш в середине прогона оставил редактор в no-throttle, см. TestRunnerNoThrottle).
+            TestRunnerNoThrottle.RecoverOnLoad(
+                !string.IsNullOrEmpty(SessionState.GetString(RunTestsTool.JobMarkerKey, "")));
 
             var invoker = new DispatchingToolInvoker(_tools, _dispatcher);
             var info = new ServerInfo
@@ -84,6 +146,7 @@ namespace Shtl.Mcp.Lifecycle
                 _http = null;
                 return;
             }
+            _listenerStartedUtc = DateTime.UtcNow; // отметка re-spawn для listenerUptimeSeconds
             Heartbeat();
         }
 
@@ -112,8 +175,56 @@ namespace Shtl.Mcp.Lifecycle
                 EnsureStarted();
             }
 
+            CheckControlFlag(); // LLM-инициируемый форс-рестарт через ~/.unity-mcp/<serverName>.cmd (AC2.6)
+            RunTestsTool.SweepOrphan(_jobs); // авто-fail зависшего/осиротевшего тест-прогона + вернуть троттлинг
+            ReloadJobs.FinalizeOnTick(_jobs, ReloadCount); // завершить recompile/set_play_mode job после reload
             Heartbeat();
         }
+
+        // Завершение set_play_mode-job по достижению целевого режима (подписка переживает reload).
+        void OnPlayModeChanged(PlayModeStateChange change) => ReloadJobs.OnPlayModeChanged(_jobs, change);
+
+        // Control-channel (INV-5/F2 §4): модель пишет `~/.unity-mcp/<serverName>.cmd`, watchdog исполняет.
+        // Работает, когда HTTP-листенер завис, но главный поток тикает. Чтение+удаление атомарно (один тик
+        // → не исполнить дважды). Канал-файл, как реестр — ноль внешних процессов.
+        void CheckControlFlag()
+        {
+            if (string.IsNullOrEmpty(_serverName))
+            {
+                return;
+            }
+            var cmdPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(RegistryPath), _serverName + ".cmd");
+            if (!System.IO.File.Exists(cmdPath))
+            {
+                return;
+            }
+            string cmd;
+            try
+            {
+                cmd = System.IO.File.ReadAllText(cmdPath).Trim();
+                System.IO.File.Delete(cmdPath); // read+delete за один тик
+            }
+            catch
+            {
+                return;
+            }
+            if (cmd == "restart")
+            {
+                RestartNow();
+            }
+        }
+
+        // Снимок конфига для get_config (строится на главном потоке, читает EditorPrefs).
+        JObject ConfigSnapshot() => new JObject
+        {
+            ["enabled"] = ShtlMcpConfig.Enabled,
+            ["portRangeStart"] = ShtlMcpConfig.PortRangeStart,
+            ["portRangeCount"] = ShtlMcpConfig.PortRangeCount,
+            ["heartbeatSeconds"] = ShtlMcpConfig.HeartbeatSeconds,
+            ["allowRunCsharp"] = ShtlMcpConfig.AllowRunCsharp,
+            ["port"] = Port,
+            ["serverName"] = _serverName
+        };
 
         int ClientCount() => (DateTime.UtcNow - _lastRequestUtc) < TimeSpan.FromSeconds(30) ? 1 : 0;
 
@@ -125,7 +236,8 @@ namespace Shtl.Mcp.Lifecycle
                 return saved;
             }
 
-            int port = PortAllocator.Allocate(ProjectPath, IsPortFree);
+            int port = PortAllocator.Allocate(ProjectPath, IsPortFree,
+                ShtlMcpConfig.PortRangeStart, ShtlMcpConfig.PortRangeCount);
             SessionState.SetInt(PortKey, port);
             return port;
         }
