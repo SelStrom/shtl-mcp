@@ -11,8 +11,23 @@ namespace Shtl.Mcp.Editor.Tests
         };
         public JArray ListTools() => Tools;
         public JObject Invoke(string name, JObject args)
-            => name == "status" ? new JObject { ["projectName"] = "PW" }
-                                : throw new System.Exception("unknown tool: " + name);
+        {
+            if (name == "status")
+            {
+                return new JObject { ["projectName"] = "PW" };
+            }
+            if (name == "img")
+            {
+                return new JObject
+                {
+                    ["_content"] = new JArray
+                    {
+                        new JObject { ["type"] = "image", ["data"] = "AAA", ["mimeType"] = "image/png" }
+                    }
+                };
+            }
+            throw new System.Exception("unknown tool: " + name);
+        }
     }
 
     public class McpRouterTests
@@ -49,6 +64,15 @@ namespace Shtl.Mcp.Editor.Tests
             Assert.IsFalse((bool)o["result"]["isError"]);
             Assert.AreEqual("text", (string)o["result"]["content"][0]["type"]);
             StringAssert.Contains("PW", (string)o["result"]["content"][0]["text"]);
+        }
+
+        [Test] public void ToolsCall_PassesThrough_ContentConvention()
+        {
+            var o = JObject.Parse(NewRouter().Handle(
+                @"{""jsonrpc"":""2.0"",""id"":6,""method"":""tools/call"",""params"":{""name"":""img"",""arguments"":{}}}"));
+            Assert.IsFalse((bool)o["result"]["isError"]);
+            Assert.AreEqual("image", (string)o["result"]["content"][0]["type"]);
+            Assert.AreEqual("image/png", (string)o["result"]["content"][0]["mimeType"]);
         }
 
         [Test] public void UnknownMethod_Returns_MethodNotFound()

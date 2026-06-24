@@ -1,0 +1,8 @@
+{
+  "name": "Shtl.Mcp.Lifecycle",
+  "rootNamespace": "Shtl.Mcp",
+  "references": ["Shtl.Mcp.Registry", "Shtl.Mcp.Dispatcher", "Shtl.Mcp.Transport", "Shtl.Mcp.Tools", "Newtonsoft.Json"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true,
+  "noEngineReferences": false
+}

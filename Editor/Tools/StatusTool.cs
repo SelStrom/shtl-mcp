@@ -23,8 +23,15 @@ namespace Shtl.Mcp.Tools
             ["mode"] = _ctx.IsPlaying ? "play" : "edit",
             ["isCompiling"] = _ctx.IsCompiling,
             ["uptimeSeconds"] = (int)_ctx.UptimeSeconds,
+            ["listenerUptimeSeconds"] = (int)_ctx.ListenerUptimeSeconds,
+            ["reloadCount"] = _ctx.ReloadCount,
             ["clients"] = _ctx.ClientCount,
-            ["health"] = "ok"
+            ["health"] = "ok",
+            // recovery-playbook (AC2.7): если сервер перестал отвечать, но Unity жив — форс-рестарт через
+            // control-flag (watchdog исполнит на ближайшем тике). Полная F7-discoverability — M3.
+            ["recovery"] = "If this server stops responding while Unity is running, write 'restart' to " +
+                "~/.unity-mcp/" + _ctx.ServerName + ".cmd; the editor watchdog recreates the listener. " +
+                "See ~/.unity-mcp/registry.json for instance details."
         };
     }
 }

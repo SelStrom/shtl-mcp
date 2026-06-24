@@ -1,0 +1,8 @@
+{
+  "name": "Shtl.Mcp.Tools",
+  "rootNamespace": "Shtl.Mcp",
+  "references": ["Shtl.Mcp.Dispatcher", "Newtonsoft.Json", "UnityEditor.TestRunner", "UnityEngine.TestRunner"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true,
+  "noEngineReferences": false
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Shtl.Mcp.Registry",
+  "rootNamespace": "Shtl.Mcp",
+  "references": ["Newtonsoft.Json"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true,
+  "noEngineReferences": false
+}

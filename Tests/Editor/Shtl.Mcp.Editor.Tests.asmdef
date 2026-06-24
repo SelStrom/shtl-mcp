@@ -1,7 +1,7 @@
 {
   "name": "Shtl.Mcp.Editor.Tests",
   "rootNamespace": "Shtl.Mcp.Editor.Tests",
-  "references": ["Shtl.Mcp.Editor", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
+  "references": ["Shtl.Mcp.Transport", "Shtl.Mcp.Dispatcher", "Shtl.Mcp.Registry", "Shtl.Mcp.Tools", "Shtl.Mcp.Lifecycle", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
   "includePlatforms": ["Editor"],
   "overrideReferences": true,
   "precompiledReferences": ["nunit.framework.dll", "Newtonsoft.Json.dll"],

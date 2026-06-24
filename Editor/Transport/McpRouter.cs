@@ -48,9 +48,13 @@ namespace Shtl.Mcp.Transport
                     try
                     {
                         var result = _tools.Invoke(name, args);
+                        // Конвенция: тул может вернуть `_content` (готовые MCP content-элементы, напр. image)
+                        // — отдаём как есть; иначе оборачиваем JSON-результат как text.
+                        var content = result["_content"] as JArray
+                            ?? new JArray { new JObject { ["type"] = "text", ["text"] = result.ToString() } };
                         return JsonRpc.Result(id, new JObject
                         {
-                            ["content"] = new JArray { new JObject { ["type"] = "text", ["text"] = result.ToString() } },
+                            ["content"] = content,
                             ["isError"] = false
                         });
                     }

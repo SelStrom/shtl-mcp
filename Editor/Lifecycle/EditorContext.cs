@@ -12,9 +12,19 @@ namespace Shtl.Mcp.Lifecycle
         readonly Func<string> _serverName;
         readonly Func<double> _uptime;
         readonly Func<int> _clients;
+        readonly Func<double> _listenerUptime;
+        readonly Func<int> _reloadCount;
 
-        public EditorContext(Func<int> port, Func<string> serverName, Func<double> uptime, Func<int> clients)
-        { _port = port; _serverName = serverName; _uptime = uptime; _clients = clients; }
+        public EditorContext(Func<int> port, Func<string> serverName, Func<double> uptime, Func<int> clients,
+            Func<double> listenerUptime, Func<int> reloadCount)
+        {
+            _port = port;
+            _serverName = serverName;
+            _uptime = uptime;
+            _clients = clients;
+            _listenerUptime = listenerUptime;
+            _reloadCount = reloadCount;
+        }
 
         public string ProjectName => Application.productName;
         public string ProjectPath => System.IO.Directory.GetParent(Application.dataPath).FullName;
@@ -25,6 +35,8 @@ namespace Shtl.Mcp.Lifecycle
         public bool IsPlaying => EditorApplication.isPlaying;
         public bool IsCompiling => EditorApplication.isCompiling;
         public double UptimeSeconds => _uptime();
+        public double ListenerUptimeSeconds => _listenerUptime();
+        public int ReloadCount => _reloadCount();
         public int ClientCount => _clients();
     }
 }

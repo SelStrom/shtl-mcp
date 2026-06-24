@@ -15,6 +15,8 @@ namespace Shtl.Mcp.Editor.Tests
         public bool IsPlaying => false;
         public bool IsCompiling => false;
         public double UptimeSeconds => 75;
+        public double ListenerUptimeSeconds => 12;
+        public int ReloadCount => 3;
         public int ClientCount => 1;
     }
 
@@ -28,6 +30,8 @@ namespace Shtl.Mcp.Editor.Tests
             Assert.AreEqual(9712, (int)o["port"]);
             Assert.AreEqual("edit", (string)o["mode"]);
             Assert.AreEqual("ok", (string)o["health"]);
+            Assert.AreEqual(3, (int)o["reloadCount"]);
+            Assert.AreEqual(12, (int)o["listenerUptimeSeconds"]);
         }
 
         [Test] public void Schema_IsObjectType()
