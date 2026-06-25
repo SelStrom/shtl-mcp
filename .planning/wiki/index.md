@@ -64,10 +64,22 @@
   gated; CodeDom-компиляция). 79/79.
 - [m2-control-flag](tasks/m2-control-flag/TASK.md) — T10: watchdog исполняет `.cmd`-флаг (`restart`,
   AC2.6) + `status.recovery` (AC2.7). E2E.
+- [m3-modal-free-scene](tasks/m3-modal-free-scene/TASK.md) — M3/T1: bg-liveness (`ping`, AC4.8) +
+  `sceneDirty` (AC4.9); dirtyScene-политика снята (аудит: scene-тулы используют непромптящие API).
+- [m3-identity-injection](tasks/m3-identity-injection/TASK.md) — M3/T2: INV-3 `projectName` во все ответы
+  тулов (кросс-каттинг в McpRouter).
+- [m3-f7-discoverability](tasks/m3-f7-discoverability/TASK.md) — M3/T3: durable recovery-блок в
+  registry.json (AC7.1), усиленный initialize.instructions (AC7.2), `recoveryHint` (AC7.3).
+- [m3-dashboard-ui](tasks/m3-dashboard-ui/TASK.md) — M3/T4: config UI + Reload-Domain кнопка (AC4.4).
+- [m3-playmode-reload](tasks/m3-playmode-reload/TASK.md) — M3/T5: `PlayModeOptionsGuard` (DisableDomainReload
+  для PlayMode-прогона, двухслойный бэкап).
+- [m3-progress-stream](tasks/m3-progress-stream/TASK.md) — M3/T6: live-прогресс run_tests в `get_job`.
 
 ## Планы вех
 - [m2-plan](m2-plan.md) — декомпозиция M2 (полный тулсет + async-job + control-flag + config +
-  asmdef split) на bite-sized таски T1–T11 с зависимостями и порядком волн.
+  asmdef split) на bite-sized таски T1–T11 с зависимостями и порядком волн. **✅ завершён.**
+- [m3-plan](m3-plan.md) — декомпозиция M3 (modal-free+bg-liveness, INV-3 identity, F7 discoverability,
+  дашборд UI, PlayMode, прогресс). 🔄 T1a bg-liveness ✅.
 
 ## Карта намерения (raw/)
 - `raw/domain/overview.md` — сущности, инварианты INV-1..5, ограничения.

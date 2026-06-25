@@ -217,3 +217,57 @@ no-throttle (отзывчивость в фоне), 6-asmdef split (Transport/Di
 config-бэкенд + footgun run_csharp (CodeDom), control-flag форс-рестарт. Все верифицированы headless e2e
 автономной дев-петлёй. Долги → M3: INV-3 identity-инъекция, F7 discoverability, config UI, PlayMode
 DisableDomainReload, прогресс-стриминг.
+
+## [2026-06-25] plan | M3 decomposition | wiki/m3-plan.md
+Старт M3: modal-free scene ops + bg-liveness (по инциденту M2 — блокирующий «Save Scene?» вешал MCP),
+INV-3 identity-инъекция, F7 discoverability, дашборд UI, PlayMode DisableDomainReload, прогресс-стриминг.
+T1 (modal-free) — первым для де-риска. v2-тулы → M4.
+
+## [2026-06-25] forward | T1a bg-liveness (AC4.8) | m3-modal-free-scene
+Инцидент M2: блокирующий модал крутит вложенный run-loop на главном потоке → update не тикает →
+main-thread-тулы виснут, листенер на фоне жив; «модал-блок» был неотличим от «down». Forward-поток: raw F4
+(+AC4.8 bg-liveness, +AC4.9 modal-free) → wiki lifecycle-and-reload §bg-liveness → code.
+`MainThreadDispatcher.LastDrainUtc` (Interlocked) + `ping`-тул (NeedsMainThread=false → отвечает на фоновом
+потоке): mainThreadAgeSeconds отличает «главный поток завис» от «down». 85/85 (+4 PingToolTests), e2e ping
+responsive. T1b dirtyScene-политика / T1c sceneDirty — следующими (перед T1b — аудит промптящих операций).
+
+## [2026-06-25] forward | T1c sceneDirty + T1b снят (аудит) | m3-modal-free-scene
+T1c: `get_hierarchy` отдаёт `sceneDirty`(`Scene.isDirty`)+`scenePath`. Аудит T1b: наши scene-тулы зовут
+непромптящие API (`OpenScene(Single)`/`EnterPlaymode`/`Refresh`/reload не открывают модал; save-промпт даёт
+лишь menu-обёртка, которую тулы не зовут) → `dirtyScene`-политика не нужна, **T1b снят**; модал инцидента
+был не от наших тулов. AC4.9 покрыт: непромптящие API + bg-liveness + sceneDirty. **T1 done.** 85/85.
+
+## [2026-06-25] forward | T2 identity-injection (INV-3) | m3-identity-injection
+`projectName` во ВСЕ ответы тулов — кросс-каттинг в `McpRouter` (text → поле JSON; image/`_content` →
+отдельный text-элемент; ошибка → префикс `[name]`). `projectName`=`Application.productName` из ShtlMcpServer.
+McpRouterTests +2; 87/87. E2e: get_config/ping/get_logs/screenshot несут projectName. Реализация INV-3 — raw
+не менялся.
+
+## [2026-06-25] forward | T3 F7 discoverability | m3-f7-discoverability
+Durable recovery-блок в registry.json (`RecoveryInfo`: controlFlagPath/steps[5]/restartCommand; AC7.1,
+пишется в Heartbeat → переживает падение), усилен initialize.instructions (registry + ping; AC7.2),
+`recoveryHint` в ответах через McpRouter (AC7.3). Шаги покрывают новый кейс M3/T1 (ping отвечает, status
+виснет → модал/компиляция). AC7.4 host-крошка отложена (opt-in + дашборд). 88/88.
+
+## [2026-06-25] forward | T4 dashboard UI | m3-dashboard-ui
+DashboardWindow: config UI (Enabled/AllowRunCsharp-footgun/port range/heartbeat, биндинг на ShtlMcpConfig) +
+Reload-Domain статус+кнопка (AC4.4). Компиляция чистая, 88/88; визуальный осмотр за человеком (editor-окно,
+screenshot его не снимает). Per-project ProjectSettings + host-крошка отложены.
+
+## [2026-06-25] forward | T5 PlayMode DisableDomainReload | m3-playmode-reload
+PlayModeOptionsGuard (зеркало TestRunnerNoThrottle): двухслойный бэкап enterPlayModeOptions, форсит
+DisableDomainReload для PlayMode-прогона (вход в Play не выгружает домен). Хуки RunTestsTool(PlayMode)/
+RunFinished/EnsureStarted/Bootstrap. Unit-тесты (4). 92/92. PlayMode-прогон e2e отложен (нет PlayMode-тестов).
+
+## [2026-06-25] forward | T6 progress-streaming | m3-progress-stream
+Live-прогресс run_tests в job: Job.Completed/Total/CurrentTest (in-memory, без персиста), JobStore.SetProgress,
+TestRunCallbacks считает по TestCaseCount/TestStarted/TestFinished, GetJobTool отдаёт progress для running.
+94/94 (+2). E2e: 15 точек прогресса с currentTest в полёте.
+
+## [2026-06-25] milestone-complete | M3
+🎉 M3 завершён: T1–T6 done. 35 тулов (+`ping`), 94 EditMode-теста зелёные. modal-free scene ops +
+bg-liveness (ping отличает «главный поток завис» от «сервер мёртв»), INV-3 identity-инъекция (projectName
+во все ответы), F7 discoverability (durable recovery-блок в registry + initialize.instructions + recoveryHint),
+дашборд UI (config + Reload-Domain кнопка), PlayMode DisableDomainReload (двухслойный guard), прогресс-стриминг
+run_tests. Все верифицированы headless e2e/unit. Долги → M4: per-project config + AC7.4 host-крошка,
+PlayMode-прогон e2e, v2-тулы.
