@@ -8,8 +8,16 @@ namespace Shtl.Mcp.Transport
         const string ProtocolVersion = "2024-11-05";
         readonly IToolInvoker _tools;
         readonly ServerInfo _info;
+        readonly string _projectName;   // INV-3: идентичность инстанса в КАЖДОМ ответе тула
+        readonly string _recoveryHint;  // F7/AC7.3: терсный указатель «где смотреть при недоступности»
 
-        public McpRouter(IToolInvoker tools, ServerInfo info) { _tools = tools; _info = info; }
+        public McpRouter(IToolInvoker tools, ServerInfo info, string projectName, string recoveryHint)
+        {
+            _tools = tools;
+            _info = info;
+            _projectName = projectName;
+            _recoveryHint = recoveryHint;
+        }
 
         public string Handle(string requestJson)
         {
@@ -48,10 +56,19 @@ namespace Shtl.Mcp.Transport
                     try
                     {
                         var result = _tools.Invoke(name, args);
-                        // Конвенция: тул может вернуть `_content` (готовые MCP content-элементы, напр. image)
-                        // — отдаём как есть; иначе оборачиваем JSON-результат как text.
-                        var content = result["_content"] as JArray
-                            ?? new JArray { new JObject { ["type"] = "text", ["text"] = result.ToString() } };
+                        JArray content;
+                        if (result["_content"] is JArray c)
+                        {
+                            // image/готовый content — идентичность отдельным text-элементом (в JSON её не вставить)
+                            c.Add(new JObject { ["type"] = "text", ["text"] = "projectName: " + _projectName });
+                            content = c;
+                        }
+                        else
+                        {
+                            result["projectName"] = _projectName;   // INV-3: идентичность в самом JSON-результате
+                            result["recoveryHint"] = _recoveryHint; // F7/AC7.3
+                            content = new JArray { new JObject { ["type"] = "text", ["text"] = result.ToString() } };
+                        }
                         return JsonRpc.Result(id, new JObject
                         {
                             ["content"] = content,
@@ -62,7 +79,7 @@ namespace Shtl.Mcp.Transport
                     {
                         return JsonRpc.Result(id, new JObject
                         {
-                            ["content"] = new JArray { new JObject { ["type"] = "text", ["text"] = "Error: " + e.Message } },
+                            ["content"] = new JArray { new JObject { ["type"] = "text", ["text"] = "[" + _projectName + "] Error: " + e.Message } },
                             ["isError"] = true
                         });
                     }

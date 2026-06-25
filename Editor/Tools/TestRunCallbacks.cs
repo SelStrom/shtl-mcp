@@ -38,17 +38,43 @@ namespace Shtl.Mcp.Tools
             _reattachApi.RegisterCallbacks(new TestRunCallbacks(jobs));
         }
 
+        int _total, _completed;
+        string _current;
+
         public void RunStarted(ITestAdaptor testsToRun)
         {
             TestRunnerNoThrottle.Apply(); // повторно (идемпотентно): прогон стартовал — держим full-rate
+            _total = testsToRun.TestCaseCount;
+            _completed = 0;
+            PushProgress();
         }
 
         public void TestStarted(ITestAdaptor test)
         {
+            if (!test.HasChildren) // только листья (реальные тесты), не сьюты
+            {
+                _current = test.Name;
+                PushProgress();
+            }
+        }
+
+        // Прогресс — best-effort в job (get_job отдаёт его для running). После reattach счётчик с нуля.
+        void PushProgress()
+        {
+            var jobId = SessionState.GetString(RunTestsTool.JobMarkerKey, "");
+            if (!string.IsNullOrEmpty(jobId))
+            {
+                _jobs.SetProgress(jobId, _completed, _total, _current);
+            }
         }
 
         public void TestFinished(ITestResultAdaptor result)
         {
+            if (!result.HasChildren)
+            {
+                _completed++;
+                PushProgress();
+            }
         }
 
         public void RunFinished(ITestResultAdaptor result)
@@ -72,6 +98,7 @@ namespace Shtl.Mcp.Tools
             _jobs.Complete(jobId, payload.ToString());
             SessionState.EraseString(RunTestsTool.JobMarkerKey);
             TestRunnerNoThrottle.Restore(); // вернуть троттлинг (внутри marker-guard → дубли колбэков не двойнят)
+            PlayModeOptionsGuard.Restore();  // вернуть enterPlayModeOptions (идемпотентно: EditMode-прогон не трогал)
         }
 
         // Обходим дерево результатов, собираем упавшие листья (имя + сообщение).

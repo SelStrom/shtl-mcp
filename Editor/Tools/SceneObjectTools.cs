@@ -186,9 +186,14 @@ namespace Shtl.Mcp.Tools
                     return new JObject { ["error"] = "root not found: " + root };
                 }
             }
+            var active = SceneManager.GetActiveScene();
             return new JObject
             {
-                ["scene"] = SceneManager.GetActiveScene().name,
+                ["scene"] = active.name,
+                ["scenePath"] = active.path, // пусто = сцена ни разу не сохранялась (untitled)
+                // sceneDirty (AC4.9): LLM решает проактивно — сохранить через save_scene перед разрушающей
+                // операцией (open_scene/recompile молча отбросят несохранённое; блокирующего модала нет).
+                ["sceneDirty"] = active.isDirty,
                 ["tree"] = SceneObjects.RootNodes(scope, maxDepth)
             };
         }

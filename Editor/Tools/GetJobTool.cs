@@ -64,6 +64,15 @@ namespace Shtl.Mcp.Tools
             {
                 o["error"] = job.Error;
             }
+            if (job.Status == "running" && job.Total > 0) // прогресс run_tests (best-effort)
+            {
+                o["progress"] = new JObject
+                {
+                    ["completed"] = job.Completed,
+                    ["total"] = job.Total,
+                    ["currentTest"] = job.CurrentTest
+                };
+            }
             return o;
         }
     }

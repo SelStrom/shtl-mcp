@@ -9,10 +9,18 @@ namespace Shtl.Mcp.Dispatch
     {
         readonly ConcurrentQueue<Action> _queue = new ConcurrentQueue<Action>();
 
+        // Метка последнего тика главного потока (Drain зовётся из EditorApplication.update каждый кадр).
+        // Читается с ФОНОВОГО потока (ping/bg-liveness, AC4.8) → Interlocked для атомарности long.
+        long _lastDrainTicks = DateTime.UtcNow.Ticks;
+
+        /// Время последнего дренажа (UTC). Возраст = «как давно тикал главный поток» — для bg-liveness.
+        public DateTime LastDrainUtc => new DateTime(Interlocked.Read(ref _lastDrainTicks), DateTimeKind.Utc);
+
         public void Enqueue(Action action) => _queue.Enqueue(action);
 
         public void Drain()
         {
+            Interlocked.Exchange(ref _lastDrainTicks, DateTime.UtcNow.Ticks); // главный поток жив на этом тике
             while (_queue.TryDequeue(out var a))
             {
                 try { a(); } catch { /* изоляция: одна упавшая работа не валит pump */ }

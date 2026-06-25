@@ -84,6 +84,7 @@ namespace Shtl.Mcp.Lifecycle
                 () => ListenerUptime, () => ReloadCount);
             _tools.Register(new StatusTool(ctx));
             _tools.Register(new GetLogsTool(_logs));
+            _tools.Register(new PingTool(() => _dispatcher.LastDrainUtc, () => ListenerUptime)); // bg-liveness (AC4.8)
             _tools.Register(new RecompileTool(_jobs, () => ReloadCount));
             _tools.Register(new SetPlayModeTool(_jobs, () => ReloadCount));
             _tools.Register(new GetJobTool(_jobs));
@@ -126,17 +127,22 @@ namespace Shtl.Mcp.Lifecycle
             EditorApplication.playModeStateChanged += OnPlayModeChanged;
             // Восстановить no-throttle: in-flight прогон → держим full-rate; иначе откатить осиротевший
             // снимок (краш в середине прогона оставил редактор в no-throttle, см. TestRunnerNoThrottle).
-            TestRunnerNoThrottle.RecoverOnLoad(
-                !string.IsNullOrEmpty(SessionState.GetString(RunTestsTool.JobMarkerKey, "")));
+            bool runPending = !string.IsNullOrEmpty(SessionState.GetString(RunTestsTool.JobMarkerKey, ""));
+            TestRunnerNoThrottle.RecoverOnLoad(runPending);
+            PlayModeOptionsGuard.RecoverOnLoad(runPending); // PlayMode-прогон: держим DisableDomainReload через reload
 
             var invoker = new DispatchingToolInvoker(_tools, _dispatcher);
             var info = new ServerInfo
             {
                 Name = _serverName,
                 Version = "0.1.0",
-                Instructions = "Unity MCP. Если станет недоступен — читай ~/.unity-mcp/registry.json."
+                Instructions = "Unity MCP server embedded in the Unity Editor. If a tool call fails " +
+                    "(connection refused/timeout), read ~/.unity-mcp/registry.json — each instance entry has " +
+                    "a 'recovery' block with steps and a restart command. The 'ping' tool answers even when the " +
+                    "main thread is blocked (modal dialog / compiling), so it tells a wedged main thread from a dead server."
             };
-            var router = new McpRouter(invoker, info);
+            var router = new McpRouter(invoker, info, Application.productName, // INV-3 + F7/AC7.3
+                "unreachable? read " + RegistryPath + " — each entry has a 'recovery' block (steps + restart command)");
 
             _http = new HttpServer(Port, router.Handle, () => _lastRequestUtc = DateTime.UtcNow);
             _http.Start();
@@ -252,6 +258,27 @@ namespace Shtl.Mcp.Lifecycle
             catch (SocketException) { return false; }
         }
 
+        // Самоописываемый recovery-блок для registry.json (F7/AC7.1) — модель читает его, когда MCP-канал мёртв.
+        RecoveryInfo BuildRecovery(int pid)
+        {
+            var cmdPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(RegistryPath), (_serverName ?? "") + ".cmd");
+            return new RecoveryInfo
+            {
+                ControlFlagPath = cmdPath,
+                RegistryPath = RegistryPath,
+                Steps = new[]
+                {
+                    "MCP call failed (connection refused/timeout)? This registry.json names the instance (pid, port).",
+                    "Is Unity alive? `kill -0 " + pid + "` (or `ps -p " + pid + "`).",
+                    "Alive but listener wedged → write 'restart' to controlFlagPath, wait ~2s, reconnect MCP, retry.",
+                    "pid dead (Unity closed/crashed) → a human must reopen Unity (out of MCP scope).",
+                    "`ping` answers but status/other main-thread tools time out → main thread is blocked " +
+                    "(modal dialog / compiling); a human may need to dismiss the modal or focus the Unity window."
+                },
+                RestartCommand = "printf 'restart' > '" + cmdPath + "'"
+            };
+        }
+
         void OnLog(string message, string stack, LogType type)
             => _logs.Add(message, stack,
                 type == LogType.Error || type == LogType.Exception || type == LogType.Assert ? LogLevel.Error :
@@ -261,6 +288,7 @@ namespace Shtl.Mcp.Lifecycle
         {
             try
             {
+                int pid = System.Diagnostics.Process.GetCurrentProcess().Id;
                 _registry.Upsert(new InstanceEntry
                 {
                     ProjectName = Application.productName,
@@ -268,12 +296,13 @@ namespace Shtl.Mcp.Lifecycle
                     UnityVersion = Application.unityVersion,
                     ServerName = _serverName,
                     Port = Port,
-                    Pid = System.Diagnostics.Process.GetCurrentProcess().Id,
+                    Pid = pid,
                     Mode = EditorApplication.isPlaying ? "play" : "edit",
                     Compiling = EditorApplication.isCompiling,
                     StartedAt = new DateTime(long.Parse(SessionState.GetString(StartedKey,
                         DateTime.UtcNow.Ticks.ToString())), DateTimeKind.Utc),
-                    LastHeartbeat = DateTime.UtcNow
+                    LastHeartbeat = DateTime.UtcNow,
+                    Recovery = BuildRecovery(pid) // F7/AC7.1: durable самоописываемое восстановление
                 });
             }
             catch { }

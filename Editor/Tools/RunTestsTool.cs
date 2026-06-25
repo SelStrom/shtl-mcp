@@ -78,6 +78,13 @@ namespace Shtl.Mcp.Tools
             // (вместе с сервером) зависнет в throttled-update. RunStarted применит повторно (идемпотентно).
             TestRunnerNoThrottle.Apply();
 
+            // PlayMode-прогон: форсировать DisableDomainReload, иначе вход в Play выгрузит домен и убьёт
+            // listener/прогон. Restore — в RunFinished (идемпотентно: для EditMode guard не применялся).
+            if (mode == "PlayMode")
+            {
+                PlayModeOptionsGuard.Apply();
+            }
+
             if (_api != null)
             {
                 UnityEngine.Object.DestroyImmediate(_api); // снять колбэки прошлого прогона (guard дублей ICallbacks)

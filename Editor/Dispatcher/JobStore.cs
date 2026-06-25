@@ -75,6 +75,20 @@ namespace Shtl.Mcp.Jobs
             Persist();
         }
 
+        /// Обновить прогресс running-job (in-memory, БЕЗ персиста — транзиентно). Главный поток (из колбэков).
+        public void SetProgress(string id, int completed, int total, string current)
+        {
+            lock (_lock)
+            {
+                if (_jobs.TryGetValue(id, out var j) && j.Status == "running")
+                {
+                    j.Completed = completed;
+                    j.Total = total;
+                    j.CurrentTest = current;
+                }
+            }
+        }
+
         /// Снимок job по id или null. Потокобезопасен (без Unity API).
         public Job Get(string id)
         {

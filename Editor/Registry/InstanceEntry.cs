@@ -14,5 +14,16 @@ namespace Shtl.Mcp.Registry
         public bool Compiling;
         public DateTime StartedAt;
         public DateTime LastHeartbeat;
+        public RecoveryInfo Recovery; // F7/AC7.1: durable самоописываемое восстановление (переживает падение)
+    }
+
+    /// Самоописываемый recovery-блок в registry.json — модель читает его при недоступности сервера
+    /// (когда MCP-канал мёртв, доставить инструкцию можно только через ФС). F7/AC7.1.
+    public sealed class RecoveryInfo
+    {
+        public string ControlFlagPath; // ~/.unity-mcp/<serverName>.cmd — записать сюда "restart"
+        public string RegistryPath;
+        public string[] Steps;
+        public string RestartCommand;
     }
 }

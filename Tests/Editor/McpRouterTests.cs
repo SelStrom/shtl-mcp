@@ -14,7 +14,7 @@ namespace Shtl.Mcp.Editor.Tests
         {
             if (name == "status")
             {
-                return new JObject { ["projectName"] = "PW" };
+                return new JObject { ["foo"] = "PW" }; // projectName инжектит роутер (INV-3)
             }
             if (name == "img")
             {
@@ -33,7 +33,7 @@ namespace Shtl.Mcp.Editor.Tests
     public class McpRouterTests
     {
         McpRouter NewRouter() => new McpRouter(new FakeInvoker(),
-            new ServerInfo { Name = "unity-pw", Version = "0.1.0", Instructions = "hi" });
+            new ServerInfo { Name = "unity-pw", Version = "0.1.0", Instructions = "hi" }, "TestProj", "RECOVERY-HINT");
 
         [Test] public void Initialize_ReturnsServerInfoAndCapabilities()
         {
@@ -73,6 +73,31 @@ namespace Shtl.Mcp.Editor.Tests
             Assert.IsFalse((bool)o["result"]["isError"]);
             Assert.AreEqual("image", (string)o["result"]["content"][0]["type"]);
             Assert.AreEqual("image/png", (string)o["result"]["content"][0]["mimeType"]);
+            // INV-3: для image-результата идентичность добавлена отдельным text-элементом
+            StringAssert.Contains("TestProj", o["result"]["content"].ToString());
+        }
+
+        [Test] public void ToolsCall_InjectsProjectName_INV3()
+        {
+            var o = JObject.Parse(NewRouter().Handle(
+                @"{""jsonrpc"":""2.0"",""id"":3,""method"":""tools/call"",""params"":{""name"":""status"",""arguments"":{}}}"));
+            StringAssert.Contains("TestProj", (string)o["result"]["content"][0]["text"]);
+            StringAssert.Contains("projectName", (string)o["result"]["content"][0]["text"]);
+        }
+
+        [Test] public void ToolsCall_InjectsRecoveryHint_F7()
+        {
+            var o = JObject.Parse(NewRouter().Handle(
+                @"{""jsonrpc"":""2.0"",""id"":3,""method"":""tools/call"",""params"":{""name"":""status"",""arguments"":{}}}"));
+            StringAssert.Contains("RECOVERY-HINT", (string)o["result"]["content"][0]["text"]);
+        }
+
+        [Test] public void ToolError_CarriesProjectName_INV3()
+        {
+            var o = JObject.Parse(NewRouter().Handle(
+                @"{""jsonrpc"":""2.0"",""id"":5,""method"":""tools/call"",""params"":{""name"":""nope"",""arguments"":{}}}"));
+            Assert.IsTrue((bool)o["result"]["isError"]);
+            StringAssert.Contains("TestProj", (string)o["result"]["content"][0]["text"]);
         }
 
         [Test] public void UnknownMethod_Returns_MethodNotFound()

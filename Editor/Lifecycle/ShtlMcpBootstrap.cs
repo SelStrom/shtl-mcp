@@ -29,10 +29,11 @@ namespace Shtl.Mcp.Lifecycle
         {
             if (!ShtlMcpConfig.Enabled)
             {
-                // Сервер не поднимаем (выключен), но осиротевший no-throttle (краш во время прогона тестов)
-                // откатываем: EditorPrefs durable, иначе редактор останется в no-throttle навсегда.
+                // Сервер не поднимаем (выключен), но осиротевшие снимки (краш во время прогона) откатываем:
+                // EditorPrefs/ProjectSettings durable, иначе редактор останется с форсированными настройками.
                 // Прогон не может быть in-flight при выключенном сервере → runPending=false.
                 TestRunnerNoThrottle.RecoverOnLoad(false);
+                PlayModeOptionsGuard.RecoverOnLoad(false);
                 return;
             }
 

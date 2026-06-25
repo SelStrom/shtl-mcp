@@ -59,5 +59,33 @@ namespace Shtl.Mcp.Editor.Tests
         {
             Assert.IsFalse(new GetJobTool(new JobStore(Key)).NeedsMainThread);
         }
+
+        [Test]
+        public void RunningJob_ReportsProgress()
+        {
+            var store = new JobStore(Key);
+            var id = store.Create("run_tests");
+            store.SetProgress(id, 3, 10, "SomeTest");
+
+            var o = new GetJobTool(store).Invoke(new JObject { ["jobId"] = id });
+
+            Assert.AreEqual("running", (string)o["status"]);
+            Assert.AreEqual(3, (int)o["progress"]["completed"]);
+            Assert.AreEqual(10, (int)o["progress"]["total"]);
+            Assert.AreEqual("SomeTest", (string)o["progress"]["currentTest"]);
+        }
+
+        [Test]
+        public void Progress_NotReported_OnDoneJob()
+        {
+            var store = new JobStore(Key);
+            var id = store.Create("run_tests");
+            store.SetProgress(id, 5, 10, "X");
+            store.Complete(id, "{}");
+
+            var o = new GetJobTool(store).Invoke(new JObject { ["jobId"] = id });
+
+            Assert.IsNull(o["progress"], "прогресс только для running");
+        }
     }
 }
