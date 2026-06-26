@@ -43,6 +43,10 @@ namespace Shtl.Mcp.Lifecycle
         public string ServerName => _serverName;
         public bool IsListening => _http != null && _http.IsListening;
 
+        // Секунд с последнего HTTP-запроса (живой коннект клиента-LLM); -1 = запросов ещё не было.
+        public double LastRequestAgeSeconds =>
+            _lastRequestUtc == DateTime.MinValue ? -1 : (DateTime.UtcNow - _lastRequestUtc).TotalSeconds;
+
         string ProjectPath => System.IO.Directory.GetParent(Application.dataPath).FullName;
         double Uptime => (DateTime.UtcNow - new DateTime(long.Parse(
             SessionState.GetString(StartedKey, DateTime.UtcNow.Ticks.ToString())), DateTimeKind.Utc)).TotalSeconds;
