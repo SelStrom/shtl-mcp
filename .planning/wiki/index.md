@@ -79,7 +79,9 @@
 - [m2-plan](m2-plan.md) — декомпозиция M2 (полный тулсет + async-job + control-flag + config +
   asmdef split) на bite-sized таски T1–T11 с зависимостями и порядком волн. **✅ завершён.**
 - [m3-plan](m3-plan.md) — декомпозиция M3 (modal-free+bg-liveness, INV-3 identity, F7 discoverability,
-  дашборд UI, PlayMode, прогресс). 🔄 T1a bg-liveness ✅.
+  дашборд UI, PlayMode, прогресс). **✅ завершён** (T1–T6 + PlayMode e2e + code-review).
+- [m4-plan](m4-plan.md) — декомпозиция M4: закрыть последние AC спеки (AC5.5 call-tail, AC7.4 host-крошка) +
+  опц. per-project config / idle-keepalive. После AC5.5+AC7.4 спека F1–F7 реализована полностью.
 
 ## Карта намерения (raw/)
 - `raw/domain/overview.md` — сущности, инварианты INV-1..5, ограничения.
