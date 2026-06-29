@@ -63,12 +63,9 @@ namespace Shtl.Mcp.Server
                 try
                 {
                     _onRequest?.Invoke();
-                    // DNS-rebinding / CSRF защита: принимаем только loopback-Host и запросы без Origin.
-                    // Легитимные MCP-клиенты (curl/Claude Code) Origin не шлют; браузер шлёт его cross-origin.
                     var host = ctx.Request.Headers["Host"];
                     var origin = ctx.Request.Headers["Origin"];
-                    bool hostOk = host == "127.0.0.1:" + Port || host == "localhost:" + Port;
-                    if (!hostOk || !string.IsNullOrEmpty(origin))
+                    if (!IsRequestAllowed(host, origin, Port))
                     {
                         ctx.Response.StatusCode = 403;
                     }
@@ -108,6 +105,16 @@ namespace Shtl.Mcp.Server
                     }
                 }
             }
+        }
+
+        /// DNS-rebinding / CSRF фильтр: пропускаем ТОЛЬКО loopback-Host нашего порта и запросы без Origin.
+        /// Легитимные MCP-клиенты (curl/Claude Code) Origin не шлют; браузер добавляет его cross-origin, а при
+        /// rebinding Host станет чужим доменом. Fail-closed: отсутствующий/чужой Host → false. Чистый — тест без
+        /// листенера (см. HttpServerFilterTests). Строгий `==`: легитимный клиент шлёт ровно «127.0.0.1:port».
+        internal static bool IsRequestAllowed(string host, string origin, int port)
+        {
+            bool hostOk = host == "127.0.0.1:" + port || host == "localhost:" + port;
+            return hostOk && string.IsNullOrEmpty(origin);
         }
 
         public void Stop()

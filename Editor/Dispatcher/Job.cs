@@ -14,5 +14,10 @@ namespace Shtl.Mcp.Jobs
         public int Completed;
         public int Total;
         public string CurrentTest;
+
+        /// Поверхностная копия для согласованного снимка. Все поля — value-типы или immutable string,
+        /// поэтому shallow-копия = корректный снимок (читатель с фонового потока не увидит torn-state,
+        /// пока главный поток мутирует живой Job).
+        public Job Clone() => (Job)MemberwiseClone();
     }
 }

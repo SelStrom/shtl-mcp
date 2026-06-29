@@ -89,13 +89,29 @@ namespace Shtl.Mcp.Jobs
             }
         }
 
-        /// Снимок job по id или null. Потокобезопасен (без Unity API).
+        /// Снимок job по id или null. Возвращает КОПИЮ под lock — читатель с фонового HTTP-потока получает
+        /// согласованный снимок, не видя torn-state от главного потока (SetProgress/Complete/Fail мутируют
+        /// живой Job). Потокобезопасен (без Unity API).
         public Job Get(string id)
         {
             lock (_lock)
             {
-                return _jobs.TryGetValue(id, out var j) ? j : null;
+                return _jobs.TryGetValue(id, out var j) ? j.Clone() : null;
             }
+        }
+
+        /// Тест-хук: сдвинуть момент старта job, чтобы проверять orphan-таймаут без реального ожидания.
+        /// Раньше тест мутировал job через Get() (живую ссылку); теперь Get отдаёт снимок — нужен явный seam.
+        internal void BackdateForTest(string id, long startedAtTicks)
+        {
+            lock (_lock)
+            {
+                if (_jobs.TryGetValue(id, out var j))
+                {
+                    j.StartedAtTicks = startedAtTicks;
+                }
+            }
+            Persist();
         }
 
         void Persist()

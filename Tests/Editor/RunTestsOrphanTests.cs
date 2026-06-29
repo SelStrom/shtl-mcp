@@ -60,7 +60,7 @@ namespace Shtl.Mcp.Editor.Tests
         {
             var jobs = new JobStore(JobsKey);
             var id = jobs.Create("run_tests");
-            jobs.Get(id).StartedAtTicks = (DateTime.UtcNow - TimeSpan.FromMinutes(20)).Ticks; // старше таймаута
+            jobs.BackdateForTest(id, (DateTime.UtcNow - TimeSpan.FromMinutes(20)).Ticks); // старше таймаута
             SessionState.SetString(RunTestsTool.JobMarkerKey, id);
 
             RunTestsTool.SweepOrphan(jobs);

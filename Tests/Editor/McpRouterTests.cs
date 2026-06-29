@@ -73,8 +73,9 @@ namespace Shtl.Mcp.Editor.Tests
             Assert.IsFalse((bool)o["result"]["isError"]);
             Assert.AreEqual("image", (string)o["result"]["content"][0]["type"]);
             Assert.AreEqual("image/png", (string)o["result"]["content"][0]["mimeType"]);
-            // INV-3: для image-результата идентичность добавлена отдельным text-элементом
+            // INV-3 + F7/AC7.3: для image-результата идентичность И recoveryHint добавлены отдельным text-элементом
             StringAssert.Contains("TestProj", o["result"]["content"].ToString());
+            StringAssert.Contains("RECOVERY-HINT", o["result"]["content"].ToString());
         }
 
         [Test] public void ToolsCall_InjectsProjectName_INV3()

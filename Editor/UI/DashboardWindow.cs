@@ -147,6 +147,18 @@ namespace Shtl.Mcp.UI
             });
         }
 
+        // `claude mcp list` печатает по строке на сервер: «<name>: <url> …». Матчим имя как токен в начале
+        // строки, иначе инстанс 'unity-foo' ложно засчитал бы дедуп-соседа 'unity-foo-ab12cd34' (подстрока).
+        static bool NameListed(string listOutput, string name)
+        {
+            if (string.IsNullOrEmpty(listOutput) || string.IsNullOrEmpty(name))
+            {
+                return false;
+            }
+            var pattern = @"(?m)^\s*" + System.Text.RegularExpressions.Regex.Escape(name) + @"\s*:";
+            return System.Text.RegularExpressions.Regex.IsMatch(listOutput, pattern);
+        }
+
         void CheckConfiguredAsync()
         {
             var name = ShtlMcpServer.Instance.ServerName;
@@ -154,7 +166,7 @@ namespace Shtl.Mcp.UI
             {
                 // Имя в выводе → точно настроен (даже если health-check вернул non-zero). Иначе: exit 0 и
                 // нет имени → не настроен; не нашли claude/ошибка → не знаем (показываем кнопку Add).
-                bool? configured = output.Contains(name) ? true : (exit == 0 ? false : (bool?)null);
+                bool? configured = NameListed(output, name) ? true : (exit == 0 ? false : (bool?)null);
                 RenderMcpArea(configured);
             });
         }

@@ -59,8 +59,8 @@ namespace Shtl.Mcp.Transport
                         JArray content;
                         if (result["_content"] is JArray c)
                         {
-                            // image/готовый content — идентичность отдельным text-элементом (в JSON её не вставить)
-                            c.Add(new JObject { ["type"] = "text", ["text"] = "projectName: " + _projectName });
+                            // image/готовый content — идентичность+hint отдельным text-элементом (в JSON их не вставить)
+                            c.Add(new JObject { ["type"] = "text", ["text"] = "projectName: " + _projectName + "\nrecoveryHint: " + _recoveryHint });
                             content = c;
                         }
                         else
