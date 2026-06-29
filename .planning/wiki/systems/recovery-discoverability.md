@@ -23,25 +23,34 @@ needs_review: false
   только по каналам ниже.
 
 ## Канал 1 — самодокументируемый реестр (durable, primary)
-`~/.unity-mcp/registry.json` несёт верхнеуровневый блок `recovery`, который пишет
-пакет при старте (переживает падение listener):
+`~/.unity-mcp/registry.json` — это **массив записей-инстансов**; каждая запись несёт
+**собственный** блок `recovery` (с конкретными pid/путями этого инстанса), который
+пишет heartbeat-пакет (переживает падение listener — пишется не из listener-потока):
 
 ```json
-{
-  "recovery": {
-    "controlFlagPath": "~/.unity-mcp/<serverName>.cmd",
-    "steps": [
-      "1. найди свой инстанс в массиве instances[] по projectPath",
-      "2. kill -0 <pid>: жив ли Unity",
-      "3a. pid жив  → printf 'restart' > <controlFlagPath>; подождать ~2с; claude mcp reconnect",
-      "3b. pid мёртв → Unity закрыт: попроси человека открыть Unity (вне зоны MCP)"
-    ]
-  },
-  "instances": [ { "...": "..." } ]
-}
+[
+  {
+    "projectName": "shtl-mcp", "serverName": "unity-shtl-mcp",
+    "port": 9730, "pid": 64351, "mode": "edit", "...": "...",
+    "recovery": {
+      "controlFlagPath": "~/.unity-mcp/<serverName>.cmd",
+      "registryPath":   "~/.unity-mcp/registry.json",
+      "steps": [
+        "MCP call failed? This registry names the instance (pid, port).",
+        "Unity alive? kill -0 <pid>.",
+        "alive but listener wedged → write 'restart' to controlFlagPath, wait ~2s, reconnect, retry.",
+        "pid dead → a human must reopen Unity (out of MCP scope).",
+        "ping answers but main-thread tools time out → main thread blocked (modal/compiling); a human may need to dismiss the modal."
+      ],
+      "restartCommand": "printf 'restart' > '<controlFlagPath>'"
+    }
+  }
+]
 ```
-Это файл, который модель и так читает первым шагом → инструкция оказывается прямо
-под рукой. Опц. дубль — `~/.unity-mcp/RECOVERY.md` (для `ls`-обнаружения и людей).
+Recovery — per-instance (а не верхнеуровневый): шаги несут pid/путь именно этого
+инстанса, поэтому модель, нашедшая свою запись по `port`/`projectPath`, сразу
+получает готовую инструкцию без подстановки. Это файл, который модель и так читает
+первым шагом. Опц. дубль — `~/.unity-mcp/RECOVERY.md` (для `ls`-обнаружения и людей).
 
 ## Канал 2 — пре-брифинг через MCP (covers основной кейс)
 - `initialize.instructions` (MCP отдаёт при подключении) и описание инструмента

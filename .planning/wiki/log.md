@@ -271,3 +271,13 @@ bg-liveness (ping отличает «главный поток завис» от
 дашборд UI (config + Reload-Domain кнопка), PlayMode DisableDomainReload (двухслойный guard), прогресс-стриминг
 run_tests. Все верифицированы headless e2e/unit. Долги → M4: per-project config + AC7.4 host-крошка,
 PlayMode-прогон e2e, v2-тулы.
+
+## [2026-06-26] forward | PlayMode e2e + code-review M3 | m3-playmode-reload
+Закрыт долг «PlayMode-прогон e2e»: реальный `run_tests mode=PlayMode` доезжает (`passed:1`), ping отзывчив
+весь прогон, reloadCount стабилен (DisableDomainReload-guard подтверждён). Источник зависаний — Test-Runner
+«Save scene?»-модал на грязной сцене (пропущен аудитом T1, т.к. это flow Test Runner'а, не scene-тул). Закрыт
+guard'ом в `run_tests` (политика `scenePolicy`: discard-дефолт/save/abort по AC4.9, modal-free). Прогон 3
+ревью-агентов по M3 (reliability/correctness/security): BLOCKER'ов нет; исправлены 2 MAJOR (silent-save→
+scenePolicy; JobStore.Get torn-read→snapshot) + MINOR (SweepOrphan restore, recoveryHint в image-ответе,
+dashboard token-boundary детект, wiki registry-структура). +18 тестов (scenePolicy 10, Host/Origin фильтр 8) →
+**112/112 EditMode**. Детали — [[m3-playmode-reload]]/journal §2026-06-26.
