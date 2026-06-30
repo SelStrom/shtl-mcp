@@ -76,6 +76,13 @@ Recovery — per-instance (а не верхнеуровневый): шаги н�
 Предлагается через дашборд/онбординг. По умолчанию — ничего (INV-2): без согласия
 в папку llm не пишется ни байта.
 
+**Реализовано (M4/T2, вариант «а»):** `HostBreadcrumb` (Lifecycle) — `Text()` (точный markdown-блок с
+маркером `<!-- shtl-mcp-recovery -->`), `IsPresent`/`AddTo` (идемпотентно, создаёт `CLAUDE.md` если нет).
+Дашборд: свёрнутый foldout с пояснением, целевым путём (`<UnityProjectRoot>/CLAUDE.md`), **превью точного
+текста** и кнопкой → `EditorUtility.DisplayDialog`-подтверждение → запись. Запись ТОЛЬКО по клику+подтверждению
+(human-инициированный модал — не MCP-freeze). Уже добавлено → «✓ already present». Вариант «б» (recovery-скилл)
+не делали — однострочной крошки достаточно для cold-start.
+
 ## Связь
 - Механизм рестарта — `lifecycle-and-reload.md` §4 (control-channel).
 - Контракт ответов (`recoveryHint`) — `command-set.md`.

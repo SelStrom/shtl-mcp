@@ -105,6 +105,31 @@ main-thread-инструменты (`status`) виснут на таймауте
 - Это диагностический сигнал; восстановление модала — программно (AC4.9, не звать
   промптящие API) либо человек/внешний канал для неожиданных модалов.
 
+## idle-keepalive главного потока (AC4.10)
+Тот же корень, что у bg-liveness, но **другой триггер — фоновый idle** (не модал).
+В фоне (окно не в фокусе + простой) Unity троттлит `EditorApplication.update` вплоть
+до секунд-минут между тиками. Так как и `dispatcher.Drain` (main-thread-инструменты),
+и `WatchdogTick` (control-flag `.cmd`, heartbeat, re-spawn) — **единственные два
+подписчика** `update`, глубокий idle заклинивает оба: `ping` (AC4.8) детектит
+(`mainThreadAgeSeconds` растёт), но НИ авто-восстановление, НИ `.cmd`-рестарт (AC2.6)
+не срабатывают — оба сами на затроттленном тике.
+- **`IdleKeepAlive` (opt-in, default OFF)** — пока сервер включён и тогл активен,
+  держит редактор в No-Throttling (`ApplicationIdleTime=0`/`InteractionMode=1`),
+  переиспользуя prefs+`ForceApply` `TestRunnerNoThrottle`. `Reconcile(wanted)` зовётся
+  с каждого `WatchdogTick` + `EnsureStarted` + тогла дашборда; **во время тест-прогона
+  не вмешивается** (no-throttle держит `TestRunnerNoThrottle`), иначе приводит prefs к
+  желаемому (wanted→full-rate, !wanted→Default) — поэтому переживает per-run Restore
+  (на следующем тике переустанавливается).
+- **Best-effort:** No-Throttling снимает foreground idle-cap; подавление именно
+  ФОНОВОГО троттла **версионно-зависимо** (на патченных LTS 2022.3.54f1+/6000.x фон
+  может троттлиться даже под No-Throttling) и не гарантируется. Источник истины о
+  фактическом затыке — `ping` (AC4.8). Не строили bg-thread-«будилку» (`SignalTick`
+  via reflection — internal/undocumented, хрупко; `QueuePlayerLoopUpdate`/`delayCall`
+  не thread-safe) — отложено как эскалация, если тогл окажется недостаточен на целевом LTS.
+- Компромисс: full-rate update в фоне = выше idle-CPU/расход батареи → тултип + default OFF.
+- Реализация — `Editor/Tools/IdleKeepAlive.cs`, конфиг `ShtlMcpConfig.IdleKeepAlive`
+  (machine-local), проводка — `ShtlMcpServer.{WatchdogTick,EnsureStarted,SyncKeepAlive}`.
+
 ## Play vs Edit для инструментов (AC4.5)
 - Осмысленные в Play (`get_hierarchy`, `find_gameobject`, `screenshot`,
   `get_logs`, `run_csharp`, `get_object`…) — работают в Play.

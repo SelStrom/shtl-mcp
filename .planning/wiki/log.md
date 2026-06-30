@@ -281,3 +281,22 @@ guard'ом в `run_tests` (политика `scenePolicy`: discard-дефолт/
 scenePolicy; JobStore.Get torn-read→snapshot) + MINOR (SweepOrphan restore, recoveryHint в image-ответе,
 dashboard token-boundary детект, wiki registry-структура). +18 тестов (scenePolicy 10, Host/Origin фильтр 8) →
 **112/112 EditMode**. Детали — [[m3-playmode-reload]]/journal §2026-06-26.
+
+## [2026-07-01] forward | M4 T1+T2 — последние AC спеки | m4-call-tail, m4-host-breadcrumb
+**T1 AC5.5** (`m4-call-tail`): `CallTail` ring-buffer (Lifecycle; в роутер — делегат, DAG цел) +
+инструментирование `tools/call` (метод/ok/мс) + дашборд-foldout «Recent calls». **T2 AC7.4**
+(`m4-host-breadcrumb`): `HostBreadcrumb` (Text/IsPresent/TargetPath/AddTo, идемпотентно) + opt-in
+дашборд-foldout (превью точного текста + confirm-диалог; запись в host-`CLAUDE.md` только по согласию
+человека). +14 тестов → **126/126 EditMode**. 🎯 **Спека F1–F7 реализована полностью — v1 feature-complete.**
+Остаток M4 (T3 per-project config, T4 idle-keepalive) — дискреционный. Детали — journals m4-*.
+
+## [2026-07-01] forward | M4 T3+T4 — M4 завершён | m4-per-project-config, m4-idle-keepalive
+**T3** `m4-per-project-config` — **closed by analysis**: committed per-project config отклонён (footgun
+`AllowRunCsharp` не должен «ездить» с проектом через VC = security-регресс; Enabled/port/heartbeat
+machine-семантичны). EditorPrefs правилен, AC2.1 удовлетворён; закреплён security-инвариант в `ShtlMcpConfig`.
+**T4** `m4-idle-keepalive` (новый **AC4.10**, forward-поток raw→wiki→code) — research-workflow (codebase
+tick-path + Unity prior-art) → Option B: opt-in тогл (default OFF) держит No-Throttling пока сервер включён,
+чтобы фоновый idle-троттл `update` не заклинивал main-thread tools + control-flag. `IdleKeepAlive.Reconcile`
+(config-агностичен, DAG цел) + проводка watchdog/EnsureStarted/дашборд; переиспользует `TestRunnerNoThrottle`.
+Best-effort (фоновый троттл версионно-зависим; `ping`/AC4.8 — источник истины). +5 тестов (RED-gate на
+per-run-restore) → **131/131 EditMode**. 🎯 **M4 завершён; F1–F7 feature-complete.**

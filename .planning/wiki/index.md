@@ -74,6 +74,14 @@
 - [m3-playmode-reload](tasks/m3-playmode-reload/TASK.md) — M3/T5: `PlayModeOptionsGuard` (DisableDomainReload
   для PlayMode-прогона, двухслойный бэкап).
 - [m3-progress-stream](tasks/m3-progress-stream/TASK.md) — M3/T6: live-прогресс run_tests в `get_job`.
+- [m4-call-tail](tasks/m4-call-tail/TASK.md) — M4/T1: хвост последних N MCP-вызовов в дашборде (AC5.5);
+  `CallTail` ring-buffer + инструментирование роутера.
+- [m4-host-breadcrumb](tasks/m4-host-breadcrumb/TASK.md) — M4/T2: opt-in host-крошка в `CLAUDE.md` (AC7.4);
+  `HostBreadcrumb` + дашборд-foldout с превью и confirm. Закрывает F7 → спека F1–F7 полная.
+- [m4-per-project-config](tasks/m4-per-project-config/TASK.md) — M4/T3: **closed by analysis** — committed
+  per-project config отклонён (footgun-security + machine-семантика); EditorPrefs правилен, AC2.1 удовлетворён.
+- [m4-idle-keepalive](tasks/m4-idle-keepalive/TASK.md) — M4/T4: opt-in keepalive (AC4.10) — держит
+  No-Throttling пока сервер включён (фон не заклинивает MCP+control-flag). `IdleKeepAlive` + проводка. Best-effort.
 
 ## Планы вех
 - [m2-plan](m2-plan.md) — декомпозиция M2 (полный тулсет + async-job + control-flag + config +
@@ -81,7 +89,8 @@
 - [m3-plan](m3-plan.md) — декомпозиция M3 (modal-free+bg-liveness, INV-3 identity, F7 discoverability,
   дашборд UI, PlayMode, прогресс). **✅ завершён** (T1–T6 + PlayMode e2e + code-review).
 - [m4-plan](m4-plan.md) — декомпозиция M4: закрыть последние AC спеки (AC5.5 call-tail, AC7.4 host-крошка) +
-  опц. per-project config / idle-keepalive. После AC5.5+AC7.4 спека F1–F7 реализована полностью.
+  опц. per-project config / idle-keepalive. 🔄 **T1+T2 ✅ → спека F1–F7 реализована полностью (v1
+  feature-complete)**; T3/T4 дискреционны.
 
 ## Карта намерения (raw/)
 - `raw/domain/overview.md` — сущности, инварианты INV-1..5, ограничения.

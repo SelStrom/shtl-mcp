@@ -62,6 +62,28 @@
   INV-4 единственное окно дашборда).
 - Тесты по факту реализации (TDD для сложных багфиксов/рефакторинга).
 
+## Прогресс (2026-07-01)
+
+- ✅ **T1 `m4-call-tail`** (AC5.5) — `CallTail` ring-buffer (Lifecycle, делегат в роутер → DAG цел) +
+  инструментирование `tools/call` (метод/ok/мс) + дашборд-foldout «Recent calls». 121/121
+  (+5 CallTail, +4 router-recording).
+- ✅ **T2 `m4-host-breadcrumb`** (AC7.4) — `HostBreadcrumb` (Text/IsPresent/TargetPath/AddTo, идемпотентно) +
+  opt-in дашборд-foldout (превью + confirm-диалог, запись за человеком). 126/126 (+5).
+
+- ✅ **T3 `m4-per-project-config`** — **closed by analysis (не строим):** committed per-project config —
+  антипаттерн для этих настроек (footgun не должен «ездить» через VC = security; Enabled/port/heartbeat —
+  machine-семантичны). EditorPrefs (machine-local) правилен, AC2.1 удовлетворён. Закреплён security-инвариант
+  footgun-локальности в `ShtlMcpConfig`.
+- ✅ **T4 `m4-idle-keepalive`** (AC4.10, forward-поток) — research-workflow → дизайн Option B: opt-in тогл
+  (default OFF) держит No-Throttling пока сервер включён (фон не заклинивает main-thread tools + control-flag).
+  `IdleKeepAlive.Reconcile` (Tools, config-агностичен) + проводка watchdog/EnsureStarted/дашборд. Best-effort
+  (фоновый троттл версионно-зависим; `ping` — источник истины). 131/131 (+5, RED-gate на per-run-restore).
+
+**🎯 M4 ЗАВЕРШЁН.** T1 (call-tail) + T2 (host-крошка) закрыли последние AC спеки → **F1–F7 feature-complete**;
+T3 закрыт анализом (committed config — антипаттерн); T4 (idle-keepalive) — forward-поток, opt-in best-effort.
+35 тулов (+ping), 131 EditMode-тест. Долги: bg-thread-«будилка» (эскалация AC4.10, если тогл недостаточен на
+целевом LTS); v2-тулы (escape-hatch-covered).
+
 ## Не в M4 (явно отложено)
 
 - v2-тулы (профайлер, packages CRUD, материалы/шейдеры, reflection) — F3 out-of-scope, escape-hatch-covered.
