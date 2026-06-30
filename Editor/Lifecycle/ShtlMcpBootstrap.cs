@@ -34,6 +34,10 @@ namespace Shtl.Mcp.Lifecycle
                 // Прогон не может быть in-flight при выключенном сервере → runPending=false.
                 TestRunnerNoThrottle.RecoverOnLoad(false);
                 PlayModeOptionsGuard.RecoverOnLoad(false);
+                // idle-keepalive пишет No-Throttling БЕЗ бэкапа → RecoverOnLoad его не откатит. При выключенном
+                // сервере watchdog (единственный, кто зовёт Reconcile) не подписан → без явного revert редактор
+                // застрял бы в No-Throttling на всю сессию. Отпускаем здесь (AC4.10: выключен → троттлинг к Default).
+                IdleKeepAlive.Reconcile(false);
                 return;
             }
 

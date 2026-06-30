@@ -33,6 +33,7 @@ namespace Shtl.Mcp.Lifecycle
         readonly JobStore _jobs = new JobStore();
         readonly ToolRegistry _tools = new ToolRegistry();
         readonly RegistryStore _registry = new RegistryStore(RegistryPath);
+        readonly CallTail _calls = new CallTail(20); // F5/AC5.5: хвост последних вызовов для дашборда
 
         HttpServer _http;
         string _serverName;
@@ -46,6 +47,9 @@ namespace Shtl.Mcp.Lifecycle
         // Секунд с последнего HTTP-запроса (живой коннект клиента-LLM); -1 = запросов ещё не было.
         public double LastRequestAgeSeconds =>
             _lastRequestUtc == DateTime.MinValue ? -1 : (DateTime.UtcNow - _lastRequestUtc).TotalSeconds;
+
+        // F5/AC5.5: хвост последних MCP-вызовов (новейшие-первыми) для дашборда.
+        public CallTail.Entry[] RecentCalls() => _calls.Snapshot();
 
         string ProjectPath => System.IO.Directory.GetParent(Application.dataPath).FullName;
         double Uptime => (DateTime.UtcNow - new DateTime(long.Parse(
@@ -146,7 +150,8 @@ namespace Shtl.Mcp.Lifecycle
                     "main thread is blocked (modal dialog / compiling), so it tells a wedged main thread from a dead server."
             };
             var router = new McpRouter(invoker, info, Application.productName, // INV-3 + F7/AC7.3
-                "unreachable? read " + RegistryPath + " — each entry has a 'recovery' block (steps + restart command)");
+                "unreachable? read " + RegistryPath + " — each entry has a 'recovery' block (steps + restart command)",
+                _calls.Record); // F5/AC5.5: писать хвост вызовов
 
             _http = new HttpServer(Port, router.Handle, () => _lastRequestUtc = DateTime.UtcNow);
             _http.Start();
@@ -158,7 +163,11 @@ namespace Shtl.Mcp.Lifecycle
             }
             _listenerStartedUtc = DateTime.UtcNow; // отметка re-spawn для listenerUptimeSeconds
             Heartbeat();
+            IdleKeepAlive.Reconcile(ShtlMcpConfig.Enabled && ShtlMcpConfig.IdleKeepAlive); // AC4.10: применить сразу на старте/после reload
         }
+
+        /// AC4.10: применить idle-keepalive немедленно (зовётся дашбордом после смены тогла).
+        public void SyncKeepAlive() => IdleKeepAlive.Reconcile(ShtlMcpConfig.Enabled && ShtlMcpConfig.IdleKeepAlive);
 
         public void StopListenerForReload()
         {
@@ -174,6 +183,9 @@ namespace Shtl.Mcp.Lifecycle
 
         public void WatchdogTick()
         {
+            // AC4.10: держать full-rate update в фоне (или отпустить, если выключено) — ДО enabled-гейта,
+            // чтобы при выключенном сервере троттлинг вернулся к Default.
+            IdleKeepAlive.Reconcile(ShtlMcpConfig.Enabled && ShtlMcpConfig.IdleKeepAlive);
             if (!ShtlMcpConfig.Enabled)
             {
                 StopListenerForReload();
@@ -189,6 +201,9 @@ namespace Shtl.Mcp.Lifecycle
             RunTestsTool.SweepOrphan(_jobs); // авто-fail зависшего/осиротевшего тест-прогона + вернуть троттлинг
             ReloadJobs.FinalizeOnTick(_jobs, ReloadCount); // завершить recompile/set_play_mode job после reload
             Heartbeat();
+            // Повторно ПОСЛЕ SweepOrphan: если он снял маркер прогона и откатил no-throttle к Default, keepalive
+            // переустанавливается в тот же тик (а не на следующем), закрывая 1-tick задержку re-assert (AC4.10).
+            IdleKeepAlive.Reconcile(ShtlMcpConfig.Enabled && ShtlMcpConfig.IdleKeepAlive);
         }
 
         // Завершение set_play_mode-job по достижению целевого режима (подписка переживает reload).
@@ -232,6 +247,7 @@ namespace Shtl.Mcp.Lifecycle
             ["portRangeCount"] = ShtlMcpConfig.PortRangeCount,
             ["heartbeatSeconds"] = ShtlMcpConfig.HeartbeatSeconds,
             ["allowRunCsharp"] = ShtlMcpConfig.AllowRunCsharp,
+            ["idleKeepAlive"] = ShtlMcpConfig.IdleKeepAlive, // AC4.10: видна ли keepalive-настройка через get_config (диагностика фон-затыка)
             ["port"] = Port,
             ["serverName"] = _serverName
         };

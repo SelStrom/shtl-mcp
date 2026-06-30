@@ -1,3 +1,5 @@
+using System;
+using System.Diagnostics;
 using Newtonsoft.Json.Linq;
 
 namespace Shtl.Mcp.Transport
@@ -10,13 +12,16 @@ namespace Shtl.Mcp.Transport
         readonly ServerInfo _info;
         readonly string _projectName;   // INV-3: идентичность инстанса в КАЖДОМ ответе тула
         readonly string _recoveryHint;  // F7/AC7.3: терсный указатель «где смотреть при недоступности»
+        readonly Action<string, bool, double> _recordCall; // F5/AC5.5: хвост вызовов (метод, ok, мс); опц.
 
-        public McpRouter(IToolInvoker tools, ServerInfo info, string projectName, string recoveryHint)
+        public McpRouter(IToolInvoker tools, ServerInfo info, string projectName, string recoveryHint,
+            Action<string, bool, double> recordCall = null)
         {
             _tools = tools;
             _info = info;
             _projectName = projectName;
             _recoveryHint = recoveryHint;
+            _recordCall = recordCall;
         }
 
         public string Handle(string requestJson)
@@ -53,9 +58,11 @@ namespace Shtl.Mcp.Transport
                     var p = (JObject)req["params"] ?? new JObject();
                     string name = (string)p["name"];
                     var args = (JObject)p["arguments"] ?? new JObject();
+                    var sw = Stopwatch.StartNew();
                     try
                     {
                         var result = _tools.Invoke(name, args);
+                        bool ok = result["error"] == null; // тул вернул {error} → логическая ошибка (✗)
                         JArray content;
                         if (result["_content"] is JArray c)
                         {
@@ -69,6 +76,7 @@ namespace Shtl.Mcp.Transport
                             result["recoveryHint"] = _recoveryHint; // F7/AC7.3
                             content = new JArray { new JObject { ["type"] = "text", ["text"] = result.ToString() } };
                         }
+                        _recordCall?.Invoke(name, ok, sw.Elapsed.TotalMilliseconds);
                         return JsonRpc.Result(id, new JObject
                         {
                             ["content"] = content,
@@ -77,6 +85,7 @@ namespace Shtl.Mcp.Transport
                     }
                     catch (System.Exception e)
                     {
+                        _recordCall?.Invoke(name, false, sw.Elapsed.TotalMilliseconds);
                         return JsonRpc.Result(id, new JObject
                         {
                             ["content"] = new JArray { new JObject { ["type"] = "text", ["text"] = "[" + _projectName + "] Error: " + e.Message } },

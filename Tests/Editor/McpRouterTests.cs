@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using Newtonsoft.Json.Linq;
 using Shtl.Mcp.Transport;
@@ -25,6 +26,10 @@ namespace Shtl.Mcp.Editor.Tests
                         new JObject { ["type"] = "image", ["data"] = "AAA", ["mimeType"] = "image/png" }
                     }
                 };
+            }
+            if (name == "err")
+            {
+                return new JObject { ["error"] = "boom" }; // логическая ошибка тула (без исключения)
             }
             throw new System.Exception("unknown tool: " + name);
         }
@@ -119,6 +124,49 @@ namespace Shtl.Mcp.Editor.Tests
             var o = JObject.Parse(NewRouter().Handle(
                 @"{""jsonrpc"":""2.0"",""id"":5,""method"":""tools/call"",""params"":{""name"":""nope"",""arguments"":{}}}"));
             Assert.IsTrue((bool)o["result"]["isError"]);
+        }
+
+        // ── F5/AC5.5: запись хвоста вызовов ──────────────────────────────────
+
+        McpRouter RecordingRouter(List<(string method, bool ok, double ms)> rec) => new McpRouter(new FakeInvoker(),
+            new ServerInfo { Name = "unity-pw", Version = "0.1.0", Instructions = "hi" }, "TestProj", "RECOVERY-HINT",
+            (m, ok, ms) => rec.Add((m, ok, ms)));
+
+        [Test] public void ToolsCall_RecordsCall_OkOnSuccess()
+        {
+            var rec = new List<(string, bool, double)>();
+            RecordingRouter(rec).Handle(
+                @"{""jsonrpc"":""2.0"",""id"":3,""method"":""tools/call"",""params"":{""name"":""status"",""arguments"":{}}}");
+            Assert.AreEqual(1, rec.Count);
+            Assert.AreEqual("status", rec[0].Item1);
+            Assert.IsTrue(rec[0].Item2, "успех → ok");
+        }
+
+        [Test] public void ToolsCall_RecordsNotOk_OnToolError()
+        {
+            var rec = new List<(string, bool, double)>();
+            RecordingRouter(rec).Handle(
+                @"{""jsonrpc"":""2.0"",""id"":3,""method"":""tools/call"",""params"":{""name"":""err"",""arguments"":{}}}");
+            Assert.AreEqual(1, rec.Count);
+            Assert.IsFalse(rec[0].Item2, "{error} в результате → ✗ (без исключения)");
+        }
+
+        [Test] public void ToolsCall_RecordsNotOk_OnException()
+        {
+            var rec = new List<(string, bool, double)>();
+            RecordingRouter(rec).Handle(
+                @"{""jsonrpc"":""2.0"",""id"":3,""method"":""tools/call"",""params"":{""name"":""nope"",""arguments"":{}}}");
+            Assert.AreEqual(1, rec.Count);
+            Assert.IsFalse(rec[0].Item2, "исключение тула → ✗");
+        }
+
+        [Test] public void NonToolCall_NotRecorded()
+        {
+            var rec = new List<(string, bool, double)>();
+            var r = RecordingRouter(rec);
+            r.Handle(@"{""jsonrpc"":""2.0"",""id"":1,""method"":""initialize"",""params"":{}}");
+            r.Handle(@"{""jsonrpc"":""2.0"",""id"":2,""method"":""tools/list"",""params"":{}}");
+            Assert.AreEqual(0, rec.Count, "хвост — только tools/call, не initialize/tools/list");
         }
     }
 }

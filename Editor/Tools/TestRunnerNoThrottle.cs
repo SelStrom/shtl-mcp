@@ -20,10 +20,11 @@ namespace Shtl.Mcp.Tools
         internal const string IdleKey = "ApplicationIdleTime"; // EditorPref: мс простоя между update; 0 = full-rate
         internal const string ModeKey = "InteractionMode";     // EditorPref: 0=Default, 1=No Throttling
 
-        const int IdleDefault = 4;
-        const int ModeDefault = 0;
-        const int IdleNoThrottle = 0;
-        const int ModeNoThrottle = 1;
+        // internal: переиспользуются IdleKeepAlive (то же no-throttle, но как постоянный floor, не per-run).
+        internal const int IdleDefault = 4;
+        internal const int ModeDefault = 0;
+        internal const int IdleNoThrottle = 0;
+        internal const int ModeNoThrottle = 1;
 
         const string SsCaptured = "Shtl.Mcp.NoThrottle.Captured";
         const string SsPrevIdle = "Shtl.Mcp.NoThrottle.PrevIdle";
@@ -219,7 +220,8 @@ namespace Shtl.Mcp.Tools
 
         // EditorPrefs-записи не вступают в силу, пока редактор не перечитает interaction-настройки.
         // Приватный static `EditorApplication.UpdateInteractionModeSettings()` — load-bearing (prior-art).
-        static void ForceApply()
+        // internal: единственная точка рефлексии, переиспользуется IdleKeepAlive (не дублировать).
+        internal static void ForceApply()
         {
             try
             {

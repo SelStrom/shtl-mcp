@@ -15,6 +15,9 @@ namespace Shtl.Mcp.UI
         Label _status, _identity, _mode, _client;
         VisualElement _mcpArea;
         Foldout _manual;
+        Foldout _callsFoldout;       // AC5.5: хвост последних вызовов
+        VisualElement _callsList;
+        VisualElement _bcArea;       // AC7.4: opt-in host-крошка
         Label _reloadDomainStatus;
         double _next;
 
@@ -36,6 +39,13 @@ namespace Shtl.Mcp.UI
             root.Add(_identity);
             root.Add(_mode);
 
+            // Хвост последних MCP-вызовов (AC5.5): метод, ✓/✗, длительность, давность.
+            _callsFoldout = new Foldout { text = "Recent calls", value = true, style = { marginTop = 6 } };
+            Indent(_callsFoldout);
+            _callsList = new VisualElement();
+            _callsFoldout.Add(_callsList);
+            root.Add(_callsFoldout);
+
             // Подключение к Claude Code: одна кнопка; если инстанс уже добавлен — прячем кнопку И manual.
             _mcpArea = new VisualElement { style = { marginTop = 8 } };
             root.Add(_mcpArea);
@@ -50,6 +60,14 @@ namespace Shtl.Mcp.UI
 
             RenderMcpArea(null); // null = «проверяем…» (после создания _manual)
             CheckConfiguredAsync();
+
+            // Host recovery breadcrumb (AC7.4) — opt-in, свёрнут. Запись только по явному подтверждению.
+            var bc = new Foldout { text = "Host recovery breadcrumb", value = false, style = { marginTop = 6 } };
+            Indent(bc);
+            _bcArea = new VisualElement();
+            bc.Add(_bcArea);
+            root.Add(bc);
+            RenderBreadcrumb();
 
             // Настройки — в foldout, свёрнуты (дашборд компактный).
             var settings = new Foldout { text = "Settings", value = false };
@@ -69,13 +87,30 @@ namespace Shtl.Mcp.UI
             noReload.RegisterValueChangedCallback(e => SetDomainReloadOff(e.newValue));
             settings.Add(noReload);
 
-            BindToggle(settings, "Server enabled (auto-start)", ShtlMcpConfig.Enabled, v => ShtlMcpConfig.Enabled = v);
+            BindToggle(settings, "Server enabled (auto-start)", ShtlMcpConfig.Enabled,
+                v =>
+                {
+                    ShtlMcpConfig.Enabled = v;
+                    ShtlMcpServer.Instance.SyncKeepAlive(); // выключение сервера → сразу отпустить keepalive-no-throttle
+                });
             BindToggle(settings, "Allow run_csharp  ⚠ FOOTGUN", ShtlMcpConfig.AllowRunCsharp, v => ShtlMcpConfig.AllowRunCsharp = v,
                 "Разрешает компиляцию+исполнение произвольного Editor-C# через run_csharp. Опасно: полный " +
                 "доступ к проекту/ФС. По умолчанию выкл; включай только осознанно и выключай после.");
             BindInt(settings, "Port range start", ShtlMcpConfig.PortRangeStart, v => ShtlMcpConfig.PortRangeStart = v);
             BindInt(settings, "Port range count", ShtlMcpConfig.PortRangeCount, v => ShtlMcpConfig.PortRangeCount = v);
             BindInt(settings, "Heartbeat seconds", ShtlMcpConfig.HeartbeatSeconds, v => ShtlMcpConfig.HeartbeatSeconds = v);
+            BindToggle(settings, "Keep editor awake while server on (idle keepalive)", ShtlMcpConfig.IdleKeepAlive,
+                v =>
+                {
+                    ShtlMcpConfig.IdleKeepAlive = v;
+                    ShtlMcpServer.Instance.SyncKeepAlive();
+                },
+                "Зачем: в фоне (окно Unity не в фокусе + простой) Unity троттлит editor update → главный поток " +
+                "почти не тикает → main-thread MCP-инструменты виснут, и даже .cmd-рестарт не срабатывает (оба " +
+                "висят на том же тике). Этот тогл держит редактор в No-Throttling, пока сервер включён → MCP " +
+                "и control-flag остаются доступны в фоне.\n\nКомпромисс: редактор не «засыпает» в фоне → выше " +
+                "idle-CPU/расход батареи. Best-effort: подавление фонового троттла версионно-зависимо (Unity " +
+                "LTS) — источник истины о затыке остаётся инструмент ping. Default OFF.");
             settings.Add(new Button(() => ShtlMcpServer.Instance.RestartNow()) { text = "Restart server", style = { marginTop = 6 } });
 
             Refresh();
@@ -316,6 +351,101 @@ namespace Shtl.Mcp.UI
             {
                 _reloadDomainStatus.text = "Reload Domain on Enter Play: " + (DomainReloadOff() ? "OFF" : "ON");
             }
+            RenderCalls();
+        }
+
+        // AC5.5: перерисовать хвост последних вызовов (новейшие сверху).
+        void RenderCalls()
+        {
+            if (_callsList == null)
+            {
+                return;
+            }
+            var calls = ShtlMcpServer.Instance.RecentCalls();
+            _callsFoldout.text = "Recent calls (" + calls.Length + ")";
+            _callsList.Clear();
+            if (calls.Length == 0)
+            {
+                _callsList.Add(new Label("— none yet —") { style = { opacity = 0.6f } });
+                return;
+            }
+            foreach (var c in calls)
+            {
+                var lbl = new Label((c.Ok ? "✓ " : "✗ ") + c.Method + "   " + c.Ms.ToString("0") + "ms   " + AgeStr(c.AtTicks));
+                if (!c.Ok)
+                {
+                    lbl.style.color = new Color(0.85f, 0.5f, 0.4f);
+                }
+                _callsList.Add(lbl);
+            }
+        }
+
+        static string AgeStr(long atTicks)
+        {
+            var sec = (System.DateTime.UtcNow - new System.DateTime(atTicks, System.DateTimeKind.Utc)).TotalSeconds;
+            if (sec < 1)
+            {
+                return "now";
+            }
+            if (sec < 90)
+            {
+                return sec.ToString("0") + "s ago";
+            }
+            return (sec / 60).ToString("0") + "m ago";
+        }
+
+        // ── AC7.4: opt-in host-крошка ────────────────────────────────────────
+
+        static string HostProjectRoot() => System.IO.Directory.GetParent(Application.dataPath).FullName;
+
+        void RenderBreadcrumb()
+        {
+            if (_bcArea == null)
+            {
+                return;
+            }
+            _bcArea.Clear();
+            var target = HostBreadcrumb.TargetPath(HostProjectRoot());
+            bool present = System.IO.File.Exists(target) && HostBreadcrumb.IsPresent(System.IO.File.ReadAllText(target));
+
+            var why = new Label("Opt-in: append a one-line recovery pointer to the host project's CLAUDE.md so a " +
+                "fresh LLM session is primed even if this server is already dead (cold-start). Default: nothing (INV-2).");
+            why.style.whiteSpace = WhiteSpace.Normal;
+            why.style.opacity = 0.8f;
+            _bcArea.Add(why);
+            _bcArea.Add(new Label("Target: " + target) { style = { opacity = 0.7f, marginTop = 2 } });
+
+            if (present)
+            {
+                _bcArea.Add(new Label("✓ already present") { style = { color = new Color(0.4f, 0.8f, 0.4f), marginTop = 2 } });
+                return;
+            }
+            var preview = new TextField { isReadOnly = true, multiline = true, value = HostBreadcrumb.Text() };
+            preview.style.marginTop = 4;
+            _bcArea.Add(preview);
+            _bcArea.Add(new Button(OnAddBreadcrumb) { text = "Add to host CLAUDE.md", style = { marginTop = 2 } });
+        }
+
+        void OnAddBreadcrumb()
+        {
+            var target = HostBreadcrumb.TargetPath(HostProjectRoot());
+            // Человеко-инициированный модал (клик по кнопке) — это НЕ MCP-freeze (тот про автономные модалы).
+            bool ok = EditorUtility.DisplayDialog("Add recovery breadcrumb?",
+                "Append the shtl-mcp recovery pointer to:\n" + target +
+                "\n\nThis edits the host project's CLAUDE.md. Proceed?", "Add", "Cancel");
+            if (!ok)
+            {
+                return;
+            }
+            try
+            {
+                HostBreadcrumb.AddTo(target);
+            }
+            catch (System.Exception e)
+            {
+                UnityEngine.Debug.LogWarning("[Shtl MCP] breadcrumb write failed: " + e.Message);
+            }
+            RenderBreadcrumb();
         }
     }
 }
