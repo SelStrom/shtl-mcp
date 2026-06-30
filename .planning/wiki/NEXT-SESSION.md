@@ -1,19 +1,23 @@
-# Промпт следующей сессии (shtl-mcp) — старт M4
+# Промпт следующей сессии (shtl-mcp) — v1 feature-complete
 
 > Скопировать как стартовое сообщение следующей сессии (или прочитать как бриф).
 
 ---
 
-Продолжаем shtl-mcp. **M1–M3 завершены** (на `main`), code-review M3 + ремедиация закоммичены
-(`faf2262` fix + `bc99a77` docs). Контекст: `CLAUDE.md`, `.planning/wiki/m4-plan.md`,
-`.planning/wiki/index.md`, `.planning/wiki/log.md` (хвост — `forward | PlayMode e2e + code-review M3`).
+Продолжаем shtl-mcp. **M1–M4 завершены** (на `main`). 🎯 **Вся спека F1–F7 реализована — v1
+feature-complete** (`7a52d1f` feat + `38d10f7` docs — M4; финальный adversarial-ревью пройден,
+0 blocker/major). Контекст: `CLAUDE.md`, `.planning/wiki/m4-plan.md`, `.planning/wiki/index.md`,
+`.planning/wiki/log.md` (хвост — `M4 T3+T4 — M4 завершён`).
 
 ## Где мы
 
-- **Вся спека F1–F7 почти закрыта.** Остались ДВА невыполненных AC (см. `m4-plan.md`):
-  **AC5.5** (дашборд: хвост последних N вызовов) и **AC7.4** (opt-in host-крошка). Закрыть их = v1
-  feature-complete. Остальное (per-project config, idle-keepalive, v2-тулы) — опц./дискреционно.
-- 35 тулов (+`ping`), **112/112 EditMode** зелёные, PlayMode-прогон e2e работает.
+- **F1–F7 + INV-1..5 закрыты.** 35 тулов (+`ping`), **131/131 EditMode** зелёные, PlayMode-прогон e2e
+  работает. M4: call-tail (AC5.5), host-крошка (AC7.4), idle-keepalive (AC4.10, opt-in best-effort);
+  per-project config (T3) закрыт анализом (committed config = security-регресс для footgun).
+- **Дискреционные долги (не блокеры):** bg-thread-«будилка» для idle (эскалация AC4.10, если тогл
+  недостаточен на целевом LTS — нужен новый raw-AC); v2-тулы (профайлер/packages CRUD — F3 out-of-scope,
+  escape-hatch-covered); get_job→✗ в call-tail при упавшем запрошенном job (working-as-design, опц. полировка).
+- Новой вехи в raw нет — следующая работа начинается с явного запроса пользователя (фича/долг).
 
 ## ⚠️ ПЕРВЫЙ ШАГ — проверить, что Unity жив
 
@@ -37,14 +41,15 @@ Headless через `curl ... http://127.0.0.1:9730/`. Новые `.cs`-файл
 (isCompiling→false) → `get_logs(error)` → `run_tests`. Полный сьют через MCP безопасен. Хук brace-style:
 `{}` без однострочных if/else и без `do...while`-форм.
 
-## Задача: исполнять M4 по волнам (`m4-plan.md`)
+## Задача: нет активной — ждём запрос пользователя
 
-1. **T1 `m4-call-tail`** (AC5.5) — ring-buffer последних N вызовов (метод/статус/длительность/время) в единой
-   точке (`McpRouter.Handle`/`DispatchingToolInvoker`) + рендер в дашборде. Реализация F5, raw есть.
-2. **T2 `m4-host-breadcrumb`** (AC7.4) — opt-in кнопка дашборда: с явного согласия пишет recovery-указатель
-   в host-`CLAUDE.md`. По умолчанию ничего (INV-2). **Outward-facing — показать текст до записи, согласие в
-   моменте.** Реализация F7, raw есть.
-3. (опц.) **T3** per-project config, **T4** idle-keepalive (T4 — forward-поток, raw сначала; интент по
-   recovery-gap человеком пока не задан — согласовать постановку).
+M4 (и вся спека) закрыты. Новой работы в raw не запланировано. Возможные направления, если попросят:
+- **bg-thread idle-«будилка»** — эскалация AC4.10, ЕСЛИ keepalive-тогл окажется недостаточен против фонового
+  троттла на целевом LTS (проверять расфокусом окна, не headless). Меняет поведение → forward-поток (новый AC).
+- **v2-тулы** (профайлер, packages CRUD, материалы/шейдеры) — F3 out-of-scope, покрыты escape hatches; делать
+  только под конкретную нужду.
+- **Визуальная приёмка дашборда** человеком (Window/Shtl MCP): Recent calls, Host breadcrumb foldout, idle-
+  keepalive тогл — UI-glue, тестов нет.
+- Любая новая фича/долг — начинать с фиксации намерения в `raw/` (forward-поток).
 
 ## Инварианты (не нарушать) — `raw/domain/overview.md` INV-1..5; forward-поток raw→wiki→code для изменения поведения. run_csharp — human-only footgun (никакой тул не выставляет AllowRunCsharp). HttpServer — loopback-only + Host/Origin fail-closed.
