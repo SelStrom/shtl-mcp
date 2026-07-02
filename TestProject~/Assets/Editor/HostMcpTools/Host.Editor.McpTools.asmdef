@@ -1,0 +1,7 @@
+{
+  "name": "Host.Editor.McpTools",
+  "rootNamespace": "Host.Editor.McpTools",
+  "references": ["Shtl.Mcp.Tools", "Newtonsoft.Json"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

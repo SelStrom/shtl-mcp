@@ -36,6 +36,7 @@ namespace Shtl.Mcp.Lifecycle
         readonly CallTail _calls = new CallTail(20); // F5/AC5.5: хвост последних вызовов для дашборда
 
         HttpServer _http;
+        bool _customToolsDiscovered; // F3/AC3.6: дискавери кастомных — один раз на инстанс (не спамить на bind-retry)
         string _serverName;
         DateTime _lastRequestUtc = DateTime.MinValue;
         DateTime _listenerStartedUtc = DateTime.MinValue;
@@ -125,6 +126,14 @@ namespace Shtl.Mcp.Lifecycle
             _tools.Register(new GetConfigTool(ConfigSnapshot));
             _tools.Register(new ExecuteMenuItemTool());
             _tools.Register(new RunCsharpTool(() => ShtlMcpConfig.AllowRunCsharp));
+            // F3/AC3.6: кастомные тулы хоста ([McpTool]) — ПОСЛЕ встроенных. Один раз на инстанс: на bind-retry
+            // (порт занят) EnsureStarted перезапускается тем же инстансом, а _tools уже содержит кастомные →
+            // повторный дискавери спамил бы «имя занято». Новый инстанс (domain reload) сбросит флаг и пере-обнаружит.
+            if (!_customToolsDiscovered)
+            {
+                ToolDiscovery.DiscoverAndRegister(_tools);
+                _customToolsDiscovered = true;
+            }
             TestRunCallbacks.ReattachIfPending(_jobs); // переподписка на in-flight прогон после domain reload
 
             // reload-job (recompile/set_play_mode) финализируются после reload: копим ошибки компиляции

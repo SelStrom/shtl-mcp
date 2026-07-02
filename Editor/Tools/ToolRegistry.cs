@@ -9,6 +9,10 @@ namespace Shtl.Mcp.Tools
         public void Register(ITool tool) => _tools[tool.Name] = tool;
         public ITool Get(string name) => _tools.TryGetValue(name, out var t) ? t : null;
 
+        /// Уже зарегистрирован тул с таким именем? Дискавери кастомных использует это, чтобы НЕ перетирать
+        /// встроенные (они регистрируются первыми) и не давать кастом-vs-кастом-override (F3/AC3.7).
+        public bool Contains(string name) => _tools.ContainsKey(name);
+
         public JArray List()
         {
             var arr = new JArray();
