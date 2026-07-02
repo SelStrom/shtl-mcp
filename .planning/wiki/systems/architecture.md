@@ -64,7 +64,7 @@ Logging/Common/Server` живут внутри новых сборок — па�
 | `Shtl.Mcp.Transport` | HttpListener + парсер/сериализатор JSON-RPC, маршрутизация MCP-методов | JsonRpc/ServerInfo, McpRouter, IToolInvoker (`Transport`); HttpServer (`Server`) | Newtonsoft |
 | `Shtl.Mcp.Dispatcher` | Очередь команд, исполнение в главном потоке, JobStore (SessionState), LogBuffer | MainThreadDispatcher (`Dispatch`); Job/JobStore (`Jobs`); LogBuffer/LogLevel (`Logging`) | Newtonsoft |
 | `Shtl.Mcp.Registry` | `~/.unity-mcp/registry.json`, heartbeat, выбор порта, дедуп serverName | InstanceEntry/RegistryStore (`Registry`); Fnv/PortAllocator/ServerName (`Common`) | Newtonsoft |
-| `Shtl.Mcp.Tools` | Реестр инструментов, реализации Core-команд, no-throttle | все тулы + ITool/IEditorContext/ToolRegistry/TestRunnerNoThrottle (`Tools`) | Dispatcher, Newtonsoft, *.TestRunner |
+| `Shtl.Mcp.Tools` | Реестр инструментов, реализации Core-команд, no-throttle, дискавери кастомных (`[McpTool]`) | все тулы + ITool/IEditorContext/ToolRegistry/TestRunnerNoThrottle + McpToolAttribute/ToolDiscovery (`Tools`) | Dispatcher, Newtonsoft, *.TestRunner |
 | `Shtl.Mcp.Lifecycle` | `InitializeOnLoad`, `AssemblyReloadEvents`, watchdog, авто-старт, композиция | EditorContext/ShtlMcpServer/Bootstrap/Config (`Lifecycle`); DispatchingToolInvoker (`Server`) | Registry, Dispatcher, Transport, Tools, Newtonsoft |
 | `Shtl.Mcp.UI` | Дашборд (UI Toolkit `EditorWindow`) | DashboardWindow (`UI`) | Lifecycle |
 

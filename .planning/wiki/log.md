@@ -300,3 +300,14 @@ tick-path + Unity prior-art) → Option B: opt-in тогл (default OFF) дер�
 (config-агностичен, DAG цел) + проводка watchdog/EnsureStarted/дашборд; переиспользует `TestRunnerNoThrottle`.
 Best-effort (фоновый троттл версионно-зависим; `ping`/AC4.8 — источник истины). +5 тестов (RED-gate на
 per-run-restore) → **131/131 EditMode**. 🎯 **M4 завершён; F1–F7 feature-complete.**
+
+## [2026-07-03] forward | M5/v2 — кастомные тулы без форка | m5-custom-tools
+Первая пост-v1 фича (extensibility). Research-workflow (5 популярных Unity-MCP + офиц. C# SDK) → выбор:
+экосистема сходится на «атрибут на типе + TypeCache-скан, без форка»; метод-авто-схема (IvanMurzak/SDK)
+несовместима с нашим стеком (Newtonsoft/Mono/.NET Standard — SDK отвергнут ранее). Выбран **hybrid**: контракт
+`ITool` (ручная `JObject`-схема) + маркер `[McpTool]` + `TypeCache.GetTypesWithAttribute`-дискавери. Forward-
+поток raw F3 (**AC3.6–3.8**) + `domain/overview.md` (закрыт drift: `[McpTool]` был в raw, не в коде) → wiki →
+code (`McpToolAttribute`, `ToolDiscovery` с изоляцией ошибок + приоритетом встроенных, `ToolRegistry.Contains`,
+проводка в `EnsureStarted`; всё в сборке Tools → DAG цел). +7 unit → **138/138**. E2e живого дискавери: пример
+`greet` в host-Editor-сборке `TestProject~` → tools/list=36, вызов работает, авто projectName/recoveryHint.
+Метод-атрибут+авто-схема и DI-контекст — v2.

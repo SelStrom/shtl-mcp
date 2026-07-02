@@ -47,6 +47,44 @@ Each running Unity instance hosts its own server on its own port and registers i
 path hash for clones/worktrees) tells the model which instance a call targets.
 `cat ~/.unity-mcp/registry.json` lists all live instances and ports.
 
+## Custom tools (extend without forking)
+Add your own project-specific MCP tool by dropping a class that implements `ITool` and is
+marked `[McpTool]` into **your project's own Editor assembly** (its asmdef must reference
+`Shtl.Mcp.Tools` and `Newtonsoft.Json`). No edit to shtl-mcp, no registration call — the
+server discovers it via reflection at startup and after every domain reload.
+
+```csharp
+using Newtonsoft.Json.Linq;
+using Shtl.Mcp.Tools;
+
+[McpTool]
+public sealed class GreetTool : ITool
+{
+    public string Name => "greet";
+    public string Description => "Return a greeting for the given name.";
+    public bool NeedsMainThread => false; // true if you touch UnityEditor/UnityEngine APIs
+
+    public JObject InputSchema => new JObject {
+        ["type"] = "object",
+        ["properties"] = new JObject { ["name"] = new JObject { ["type"] = "string" } },
+        ["required"] = new JArray { "name" }
+    };
+
+    public JObject Invoke(JObject args)
+    {
+        var name = (string)args["name"];
+        if (string.IsNullOrEmpty(name)) return new JObject { ["error"] = "name is required" };
+        return new JObject { ["greeting"] = "Hello, " + name + "!" };
+    }
+}
+```
+
+Rules: public parameterless constructor; return a structured `{ "error": ... }` instead of
+throwing; a custom tool whose `Name` collides with a built-in is rejected (built-ins win); a
+broken tool is skipped with a console warning without stopping the server. `projectName` and
+`recoveryHint` are added to the response automatically. After adding a tool, reconnect the MCP
+client to refresh its tool list. Working example: `TestProject~/Assets/Editor/HostMcpTools/`.
+
 ## Tools (M1)
 | Tool | Description |
 |------|-------------|

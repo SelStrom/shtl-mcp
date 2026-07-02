@@ -72,6 +72,27 @@ art (CoderGamester/mcp-unity, IvanMurzak/Unity-MCP, CoplayDev/unity-mcp) и сж
   см. `recovery-discoverability.md`).
 - Ошибки — структурированные (понятный текст + код), не исключение наружу.
 
+## Кастомные инструменты хоста (F3/AC3.6–3.8)
+Host-проект расширяет тулсет **без форка**: кладёт в свою Editor-сборку класс,
+реализующий `ITool` и помеченный `[McpTool]` (оба из `Shtl.Mcp.Tools`; host-asmdef
+референсит `Shtl.Mcp.Tools` + `Newtonsoft.Json`). `[McpTool]` — **маркер класса** (не
+метод-атрибут): схема пишется вручную как `JObject` (как у встроенных), метод-авто-схема
+намеренно НЕ делалась (несовместима со стеком .NET Standard/Mono/Newtonsoft; см.
+[[architecture]] — SDK отвергнут). Дискавери — `TypeCache.GetTypesWithAttribute<McpTool>`
+в `ShtlMcpServer.EnsureStarted` ПОСЛЕ встроенных (и на каждом reload; TypeCache дёшев).
+- **Изоляция:** битый тул (исключение в ctor или в геттере `Name`/`Description`/`InputSchema`
+  / нет parameterless-ctor / пустой `Name`) → warning в консоль + пропуск, старт не падает.
+  Контракт прогревается на обнаружении → битый тул не отравит `tools/list`. Ctor исполняется
+  на главном потоке при старте/reload → обязан быть дешёвым (тяжёлый застопорит старт).
+- **Приоритет:** имя = уже зарегистрированному → пропуск позднего (встроенные первыми →
+  приоритетны; кастом-vs-кастом: детерминированно побеждает лексикографически первый по FullName —
+  `TypeCache`-порядок undefined, поэтому дискавери сортирует). Без тихого override.
+- **Не footgun:** обычный тул, не требует `AllowRunCsharp`.
+- **Зависимости:** MVP — parameterless-ctor + прямые UnityEditor/UnityEngine API в
+  `Invoke`. DI/контекст (доступ к JobStore/async-job) и метод-атрибут+авто-схема — v2.
+- Новый тул виден клиенту после reconnect (`notifications/tools/list_changed` не шлём —
+  клиенты и так переподключаются). Файл вне Editor-сборки TypeCache не увидит.
+
 ## v2 / опционально (достижимо через escape hatches)
 Профайлер, packages CRUD, материалы/шейдеры-специфика, reflection-API,
 isolated/camera-screenshot, `resources/*` MCP, SSE-стрим прогресса/логов.

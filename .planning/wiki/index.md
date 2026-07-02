@@ -82,6 +82,8 @@
   per-project config отклонён (footgun-security + machine-семантика); EditorPrefs правилен, AC2.1 удовлетворён.
 - [m4-idle-keepalive](tasks/m4-idle-keepalive/TASK.md) — M4/T4: opt-in keepalive (AC4.10) — держит
   No-Throttling пока сервер включён (фон не заклинивает MCP+control-flag). `IdleKeepAlive` + проводка. Best-effort.
+- [m5-custom-tools](tasks/m5-custom-tools/TASK.md) — M5/v2: кастомные тулы host-проекта без форка (AC3.6–3.8);
+  `[McpTool]` + `TypeCache`-дискавери `ITool`-классов. Research 5 Unity-MCP → hybrid (ITool + маркер, не авто-схема).
 
 ## Планы вех
 - [m2-plan](m2-plan.md) — декомпозиция M2 (полный тулсет + async-job + control-flag + config +
