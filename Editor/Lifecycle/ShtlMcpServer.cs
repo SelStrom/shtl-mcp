@@ -27,6 +27,9 @@ namespace Shtl.Mcp.Lifecycle
         static readonly TimeSpan Ttl = TimeSpan.FromSeconds(30);
         static readonly string RegistryPath = System.IO.Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".unity-mcp", "registry.json");
+        // Версия пакета из package.json; null — если исходники живут в Assets/ вне UPM-пакета.
+        static readonly string PackageVersion = UnityEditor.PackageManager.PackageInfo
+            .FindForAssembly(typeof(ShtlMcpServer).Assembly)?.version ?? "unknown";
 
         readonly MainThreadDispatcher _dispatcher = new MainThreadDispatcher();
         readonly LogBuffer _logs = new LogBuffer(500);
@@ -152,7 +155,7 @@ namespace Shtl.Mcp.Lifecycle
             var info = new ServerInfo
             {
                 Name = _serverName,
-                Version = "0.1.0",
+                Version = PackageVersion,
                 Instructions = "Unity MCP server embedded in the Unity Editor. If a tool call fails " +
                     "(connection refused/timeout), read ~/.unity-mcp/registry.json — each instance entry has " +
                     "a 'recovery' block with steps and a restart command. The 'ping' tool answers even when the " +
