@@ -4,8 +4,9 @@ Self-contained **MCP (Model Context Protocol) server embedded in the Unity Edito
 no external bridge process, no Node/Python. Gives LLM agents (Claude Code and other
 MCP-over-HTTP clients) JSON-RPC control over the running Unity instance.
 
-> Status: **M1 — Walking Skeleton** (`0.1.0`). Core transport + lifecycle + 2 tools.
-> See [CHANGELOG](CHANGELOG.md) for the roadmap.
+> Status: **M4 — spec completion + reliability** (`0.4.0`). Full F1–F7 spec implemented
+> (feature-complete): 35 built-in tools + custom-tool extension point.
+> See [CHANGELOG](CHANGELOG.md) for the history.
 
 ## Requirements
 - Unity **2022.3 LTS** or newer.
@@ -85,11 +86,18 @@ broken tool is skipped with a console warning without stopping the server. `proj
 `recoveryHint` are added to the response automatically. After adding a tool, reconnect the MCP
 client to refresh its tool list. Working example: `TestProject~/Assets/Editor/HostMcpTools/`.
 
-## Tools (M1)
-| Tool | Description |
-|------|-------------|
-| `status` | Instance identity (project, path, version, port, pid), mode (edit/play), `isCompiling`, health. |
-| `get_logs` | Recent Unity console logs; filter by `minLevel` (info/warning/error) and `count`. |
+## Tools
+35 built-in tools; the live list (with schemas) comes from `tools/list` after connecting.
+
+| Category | Tools |
+|----------|-------|
+| Diagnostics | `status`, `ping` (answers even when the main thread is blocked), `get_logs`, `clear_logs`, `get_config`, `get_job` |
+| Lifecycle (reload-spanning jobs) | `recompile`, `set_play_mode`, `run_tests` (EditMode/PlayMode) |
+| Assets | `refresh_assets`, `find_assets`, `read_asset`, `move_asset`, `delete_asset`, `create_folder` |
+| Prefabs | `create_prefab`, `open_prefab`, `save_prefab`, `close_prefab`, `instantiate_prefab` |
+| Scene & GameObjects | `open_scene`, `save_scene`, `get_hierarchy`, `find_gameobject`, `gameobject_create`, `gameobject_destroy`, `gameobject_modify`, `get_object`, `modify_object`, `set_parent`, `get_selection`, `set_selection` |
+| Capture | `screenshot` (Game/Scene view as MCP image content) |
+| Escape hatches | `execute_menu_item`, `run_csharp` (footgun-gated, human-only) |
 
 ## Reliability
 The server survives script recompilation and play/edit transitions: the listener is
