@@ -18,8 +18,12 @@ namespace Shtl.Mcp.UI
         Foldout _callsFoldout;       // AC5.5: хвост последних вызовов
         VisualElement _callsList;
         VisualElement _bcArea;       // AC7.4: opt-in host-крошка
-        Label _reloadDomainStatus;
+        VisualElement _warnArea;     // AC5.4: ⚠ Reload Domain on Play — виден только когда включён
+        Toggle _noReload;
         double _next;
+        long _callsSig = -1;         // AC5.5: «подпись» хвоста — строки пересобираются только при изменении состава
+        readonly System.Collections.Generic.List<(Label lbl, long ticks)> _ageCells
+            = new System.Collections.Generic.List<(Label lbl, long ticks)>();
 
         // Фоновый поток (claude) кладёт сюда коллбэк, главный поток (Update) исполняет. EditorApplication.*
         // нельзя трогать с фонового потока — это и была ошибка в консоли.
@@ -28,27 +32,26 @@ namespace Shtl.Mcp.UI
 
         public void CreateGUI()
         {
+            minSize = new Vector2(320, 240);
             var root = rootVisualElement;
-            root.style.paddingLeft = root.style.paddingTop = 8;
+            root.style.paddingLeft = root.style.paddingTop = root.style.paddingRight = root.style.paddingBottom = 8;
+
+            // Контент в ScrollView: окно меньше контента → скролл, а не молчаливый клип.
+            var scroll = new ScrollView { style = { flexGrow = 1 } };
+            root.Add(scroll);
+
             _status = new Label();   // своё состояние сервера
             _client = new Label();   // живой коннект LLM-клиента
             _identity = new Label();
             _mode = new Label();
-            root.Add(_status);
-            root.Add(_client);
-            root.Add(_identity);
-            root.Add(_mode);
-
-            // Хвост последних MCP-вызовов (AC5.5): метод, ✓/✗, длительность, давность.
-            _callsFoldout = new Foldout { text = "Recent calls", value = true, style = { marginTop = 6 } };
-            Indent(_callsFoldout);
-            _callsList = new VisualElement();
-            _callsFoldout.Add(_callsList);
-            root.Add(_callsFoldout);
+            scroll.Add(_status);
+            scroll.Add(_client);
+            scroll.Add(_identity);
+            scroll.Add(_mode);
 
             // Подключение к Claude Code: одна кнопка; если инстанс уже добавлен — прячем кнопку И manual.
             _mcpArea = new VisualElement { style = { marginTop = 8 } };
-            root.Add(_mcpArea);
+            scroll.Add(_mcpArea);
 
             // Manual fallback (свёрнут): готовая команда. Скрывается вместе с кнопкой Add, когда настроено.
             _manual = new Foldout { text = "Manual add command", value = false };
@@ -56,26 +59,40 @@ namespace Shtl.Mcp.UI
             var cmd = new TextField { isReadOnly = true, multiline = true, value = AddCommand() };
             _manual.Add(cmd);
             _manual.Add(new Button(() => EditorGUIUtility.systemCopyBuffer = cmd.value) { text = "Copy" });
-            root.Add(_manual);
+            scroll.Add(_manual);
 
             RenderMcpArea(null); // null = «проверяем…» (после создания _manual)
             CheckConfiguredAsync();
+
+            // AC5.4: предупреждение в основной области, видно только пока Reload Domain on Play включён.
+            _warnArea = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, marginTop = 6 } };
+            _warnArea.Add(new Label("⚠ Reload Domain on Play: ON — every Play enter kills the MCP listener for seconds")
+            {
+                style = { color = new Color(0.9f, 0.72f, 0.3f), whiteSpace = WhiteSpace.Normal, flexGrow = 1, flexShrink = 1 }
+            });
+            _warnArea.Add(new Button(() => { SetDomainReloadOff(true); Refresh(); }) { text = "Fix" });
+            scroll.Add(_warnArea);
+
+            // Хвост последних MCP-вызовов (AC5.5): метод, ✓/✗, длительность, давность.
+            _callsFoldout = new Foldout { text = "Recent calls", value = true, style = { marginTop = 6 } };
+            Indent(_callsFoldout);
+            _callsList = new VisualElement();
+            _callsFoldout.Add(_callsList);
+            scroll.Add(_callsFoldout);
 
             // Host recovery breadcrumb (AC7.4) — opt-in, свёрнут. Запись только по явному подтверждению.
             var bc = new Foldout { text = "Host recovery breadcrumb", value = false, style = { marginTop = 6 } };
             Indent(bc);
             _bcArea = new VisualElement();
             bc.Add(_bcArea);
-            root.Add(bc);
+            scroll.Add(bc);
             RenderBreadcrumb();
 
             // Настройки — в foldout, свёрнуты (дашборд компактный).
             var settings = new Foldout { text = "Settings", value = false };
             Indent(settings);
-            root.Add(settings);
+            scroll.Add(settings);
 
-            _reloadDomainStatus = new Label();
-            settings.Add(_reloadDomainStatus);
             var noReload = new Toggle("Disable domain reload on Enter Play") { value = DomainReloadOff() };
             noReload.tooltip =
                 "Зачем: вход в Play по умолчанию выгружает C#-домен (Reload Domain ON) → in-Unity MCP-листенер " +
@@ -86,6 +103,7 @@ namespace Shtl.Mcp.UI
                 "решай по проекту. Unity-дефолт: reload ON (этот тогл OFF).";
             noReload.RegisterValueChangedCallback(e => SetDomainReloadOff(e.newValue));
             settings.Add(noReload);
+            _noReload = noReload;
 
             BindToggle(settings, "Server enabled (auto-start)", ShtlMcpConfig.Enabled,
                 v =>
@@ -111,7 +129,12 @@ namespace Shtl.Mcp.UI
                 "и control-flag остаются доступны в фоне.\n\nКомпромисс: редактор не «засыпает» в фоне → выше " +
                 "idle-CPU/расход батареи. Best-effort: подавление фонового троттла версионно-зависимо (Unity " +
                 "LTS) — источник истины о затыке остаётся инструмент ping. Default OFF.");
-            settings.Add(new Button(() => ShtlMcpServer.Instance.RestartNow()) { text = "Restart server", style = { marginTop = 6 } });
+            // AC5.6: рестарт — постоянное действие дашборда (как в макете), не спрятан в Settings.
+            scroll.Add(new Button(() => ShtlMcpServer.Instance.RestartNow())
+            {
+                text = "Restart server",
+                style = { marginTop = 8, alignSelf = Align.FlexEnd }
+            });
 
             Refresh();
         }
@@ -347,14 +370,19 @@ namespace Shtl.Mcp.UI
 
             _identity.text = "project: " + Application.productName;
             _mode.text = "mode: " + (EditorApplication.isPlaying ? "PLAY" : "EDIT");
-            if (_reloadDomainStatus != null)
+            bool reloadOff = DomainReloadOff();
+            if (_warnArea != null)
             {
-                _reloadDomainStatus.text = "Reload Domain on Enter Play: " + (DomainReloadOff() ? "OFF" : "ON");
+                _warnArea.style.display = reloadOff ? DisplayStyle.None : DisplayStyle.Flex;
             }
+            // Fix-кнопка/правка настроек снаружи → тогл в Settings не должен рассинхронизироваться
+            _noReload?.SetValueWithoutNotify(reloadOff);
             RenderCalls();
         }
 
-        // AC5.5: перерисовать хвост последних вызовов (новейшие сверху).
+        // AC5.5: хвост последних вызовов (новейшие сверху) колонками: ✓/✗ | метод (ellipsis) | ms | возраст.
+        // Строки пересобираются только при изменении состава вызовов; на прочих тиках обновляются лишь
+        // «N s ago»-ячейки — без пересоздания элементов список не мерцает и не аллоцирует каждую секунду.
         void RenderCalls()
         {
             if (_callsList == null)
@@ -363,6 +391,17 @@ namespace Shtl.Mcp.UI
             }
             var calls = ShtlMcpServer.Instance.RecentCalls();
             _callsFoldout.text = "Recent calls (" + calls.Length + ")";
+            long sig = calls.Length == 0 ? 0 : calls[0].AtTicks ^ ((long)calls.Length << 56);
+            if (sig == _callsSig)
+            {
+                foreach (var (lbl, ticks) in _ageCells)
+                {
+                    lbl.text = AgeStr(ticks);
+                }
+                return;
+            }
+            _callsSig = sig;
+            _ageCells.Clear();
             _callsList.Clear();
             if (calls.Length == 0)
             {
@@ -371,12 +410,39 @@ namespace Shtl.Mcp.UI
             }
             foreach (var c in calls)
             {
-                var lbl = new Label((c.Ok ? "✓ " : "✗ ") + c.Method + "   " + c.Ms.ToString("0") + "ms   " + AgeStr(c.AtTicks));
+                var row = new VisualElement { style = { flexDirection = FlexDirection.Row } };
+                var mark = new Label(c.Ok ? "✓" : "✗") { style = { width = 16, flexShrink = 0 } };
+                var method = new Label(c.Method)
+                {
+                    tooltip = c.Method, // узкое окно клипает имя (ellipsis) → полное имя в тултипе
+                    style =
+                    {
+                        flexGrow = 1, flexShrink = 1,
+                        overflow = Overflow.Hidden,
+                        textOverflow = TextOverflow.Ellipsis,
+                        whiteSpace = WhiteSpace.NoWrap
+                    }
+                };
+                var ms = new Label(c.Ms.ToString("0") + " ms")
+                {
+                    style = { width = 56, flexShrink = 0, unityTextAlign = TextAnchor.MiddleRight, opacity = 0.8f }
+                };
+                var age = new Label(AgeStr(c.AtTicks))
+                {
+                    style = { width = 64, flexShrink = 0, unityTextAlign = TextAnchor.MiddleRight, opacity = 0.7f }
+                };
                 if (!c.Ok)
                 {
-                    lbl.style.color = new Color(0.85f, 0.5f, 0.4f);
+                    var err = new Color(0.85f, 0.5f, 0.4f);
+                    mark.style.color = err;
+                    method.style.color = err;
                 }
-                _callsList.Add(lbl);
+                row.Add(mark);
+                row.Add(method);
+                row.Add(ms);
+                row.Add(age);
+                _ageCells.Add((age, c.AtTicks));
+                _callsList.Add(row);
             }
         }
 
