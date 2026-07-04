@@ -21,9 +21,9 @@ namespace Shtl.Mcp.UI
         VisualElement _warnArea;     // AC5.4: ⚠ Reload Domain on Play — виден только когда включён
         Toggle _noReload;
         double _next;
-        long _callsSig = -1;         // AC5.5: «подпись» хвоста — строки пересобираются только при изменении состава
-        readonly System.Collections.Generic.List<(Label lbl, long ticks)> _ageCells
-            = new System.Collections.Generic.List<(Label lbl, long ticks)>();
+        long _callsSig = -1;         // AC5.5: «подпись» хвоста — UI трогается только при изменении состава
+
+        const float SectionGap = 8;  // единый вертикальный отступ между блоками дашборда
 
         // Фоновый поток (claude) кладёт сюда коллбэк, главный поток (Update) исполняет. EditorApplication.*
         // нельзя трогать с фонового потока — это и была ошибка в консоли.
@@ -50,7 +50,8 @@ namespace Shtl.Mcp.UI
             scroll.Add(_mode);
 
             // Подключение к Claude Code: одна кнопка; если инстанс уже добавлен — прячем кнопку И manual.
-            _mcpArea = new VisualElement { style = { marginTop = 8 } };
+            // Manual — часть этого же блока (без отступа), скрывается/показывается вместе с кнопкой.
+            _mcpArea = new VisualElement { style = { marginTop = SectionGap } };
             scroll.Add(_mcpArea);
 
             // Manual fallback (свёрнут): готовая команда. Скрывается вместе с кнопкой Add, когда настроено.
@@ -65,7 +66,7 @@ namespace Shtl.Mcp.UI
             CheckConfiguredAsync();
 
             // AC5.4: предупреждение в основной области, видно только пока Reload Domain on Play включён.
-            _warnArea = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, marginTop = 6 } };
+            _warnArea = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center, marginTop = SectionGap } };
             _warnArea.Add(new Label("⚠ Reload Domain on Play: ON — every Play enter kills the MCP listener for seconds")
             {
                 style = { color = new Color(0.9f, 0.72f, 0.3f), whiteSpace = WhiteSpace.Normal, flexGrow = 1, flexShrink = 1 }
@@ -73,15 +74,15 @@ namespace Shtl.Mcp.UI
             _warnArea.Add(new Button(() => { SetDomainReloadOff(true); Refresh(); }) { text = "Fix" });
             scroll.Add(_warnArea);
 
-            // Хвост последних MCP-вызовов (AC5.5): метод, ✓/✗, длительность, давность.
-            _callsFoldout = new Foldout { text = "Recent calls", value = true, style = { marginTop = 6 } };
+            // Хвост последних MCP-вызовов (AC5.5): метод, ✓/✗, длительность, время.
+            _callsFoldout = new Foldout { text = "Recent calls", value = true, style = { marginTop = SectionGap } };
             Indent(_callsFoldout);
             _callsList = new VisualElement();
             _callsFoldout.Add(_callsList);
             scroll.Add(_callsFoldout);
 
             // Host recovery breadcrumb (AC7.4) — opt-in, свёрнут. Запись только по явному подтверждению.
-            var bc = new Foldout { text = "Host recovery breadcrumb", value = false, style = { marginTop = 6 } };
+            var bc = new Foldout { text = "Host recovery breadcrumb", value = false, style = { marginTop = SectionGap } };
             Indent(bc);
             _bcArea = new VisualElement();
             bc.Add(_bcArea);
@@ -89,7 +90,7 @@ namespace Shtl.Mcp.UI
             RenderBreadcrumb();
 
             // Настройки — в foldout, свёрнуты (дашборд компактный).
-            var settings = new Foldout { text = "Settings", value = false };
+            var settings = new Foldout { text = "Settings", value = false, style = { marginTop = SectionGap } };
             Indent(settings);
             scroll.Add(settings);
 
@@ -133,7 +134,7 @@ namespace Shtl.Mcp.UI
             scroll.Add(new Button(() => ShtlMcpServer.Instance.RestartNow())
             {
                 text = "Restart server",
-                style = { marginTop = 8, alignSelf = Align.FlexEnd }
+                style = { marginTop = SectionGap, alignSelf = Align.FlexEnd }
             });
 
             Refresh();
@@ -281,14 +282,17 @@ namespace Shtl.Mcp.UI
 
                 using (var p = Process.Start(psi))
                 {
+                    // Читать пайпы ДО ожидания выхода: дочерний процесс с выводом больше буфера пайпа
+                    // блокируется на write и никогда не выйдет (взаимная блокировка с WaitForExit).
+                    var outTask = p.StandardOutput.ReadToEndAsync();
+                    var errTask = p.StandardError.ReadToEndAsync();
                     if (!p.WaitForExit(timeoutMs))
                     {
                         try { p.Kill(); } catch { }
                         return (-1, "timeout");
                     }
-                    var outp = p.StandardOutput.ReadToEnd();
-                    var err = p.StandardError.ReadToEnd();
-                    return (p.ExitCode, (outp + err).Trim());
+                    // процесс вышел → стримы закрываются, ReadToEndAsync довершается (мы на фоновом потоке)
+                    return (p.ExitCode, (outTask.Result + errTask.Result).Trim());
                 }
             }
             catch (System.Exception e)
@@ -362,11 +366,13 @@ namespace Shtl.Mcp.UI
             bool up = s.IsListening;
             _status.text = "server: " + (up ? "● running" : "○ stopped") + "   " + s.ServerName + "   :" + s.Port;
 
+            // Без секундного счётчика: текст меняется только при смене состояния (none/active/idle) —
+            // дефолтный дашборд ничего не перерисовывает по тику.
             double age = s.LastRequestAgeSeconds;
             _client.text = "LLM client: " + (
                 age < 0 ? "○ none yet (waiting for first call)" :
-                age < 30 ? $"● active ({age:0}s ago)" :
-                $"○ idle ({age:0}s since last call)");
+                age < 30 ? "● active" :
+                "○ idle");
 
             _identity.text = "project: " + Application.productName;
             _mode.text = "mode: " + (EditorApplication.isPlaying ? "PLAY" : "EDIT");
@@ -380,9 +386,9 @@ namespace Shtl.Mcp.UI
             RenderCalls();
         }
 
-        // AC5.5: хвост последних вызовов (новейшие сверху) колонками: ✓/✗ | метод (ellipsis) | ms | возраст.
-        // Строки пересобираются только при изменении состава вызовов; на прочих тиках обновляются лишь
-        // «N s ago»-ячейки — без пересоздания элементов список не мерцает и не аллоцирует каждую секунду.
+        // AC5.5: хвост последних вызовов (новейшие сверху) колонками: ✓/✗ | метод (ellipsis) | ms | HH:mm:ss.
+        // Время абсолютное (как в макете) → строки статичны: UI трогается ТОЛЬКО при изменении состава
+        // вызовов, в остальное время тик не перерисовывает ничего.
         void RenderCalls()
         {
             if (_callsList == null)
@@ -390,18 +396,13 @@ namespace Shtl.Mcp.UI
                 return;
             }
             var calls = ShtlMcpServer.Instance.RecentCalls();
-            _callsFoldout.text = "Recent calls (" + calls.Length + ")";
             long sig = calls.Length == 0 ? 0 : calls[0].AtTicks ^ ((long)calls.Length << 56);
             if (sig == _callsSig)
             {
-                foreach (var (lbl, ticks) in _ageCells)
-                {
-                    lbl.text = AgeStr(ticks);
-                }
                 return;
             }
             _callsSig = sig;
-            _ageCells.Clear();
+            _callsFoldout.text = "Recent calls (" + calls.Length + ")";
             _callsList.Clear();
             if (calls.Length == 0)
             {
@@ -427,7 +428,7 @@ namespace Shtl.Mcp.UI
                 {
                     style = { width = 56, flexShrink = 0, unityTextAlign = TextAnchor.MiddleRight, opacity = 0.8f }
                 };
-                var age = new Label(AgeStr(c.AtTicks))
+                var at = new Label(TimeStr(c.AtTicks))
                 {
                     style = { width = 64, flexShrink = 0, unityTextAlign = TextAnchor.MiddleRight, opacity = 0.7f }
                 };
@@ -440,25 +441,13 @@ namespace Shtl.Mcp.UI
                 row.Add(mark);
                 row.Add(method);
                 row.Add(ms);
-                row.Add(age);
-                _ageCells.Add((age, c.AtTicks));
+                row.Add(at);
                 _callsList.Add(row);
             }
         }
 
-        static string AgeStr(long atTicks)
-        {
-            var sec = (System.DateTime.UtcNow - new System.DateTime(atTicks, System.DateTimeKind.Utc)).TotalSeconds;
-            if (sec < 1)
-            {
-                return "now";
-            }
-            if (sec < 90)
-            {
-                return sec.ToString("0") + "s ago";
-            }
-            return (sec / 60).ToString("0") + "m ago";
-        }
+        static string TimeStr(long atTicks)
+            => new System.DateTime(atTicks, System.DateTimeKind.Utc).ToLocalTime().ToString("HH:mm:ss");
 
         // ── AC7.4: opt-in host-крошка ────────────────────────────────────────
 
