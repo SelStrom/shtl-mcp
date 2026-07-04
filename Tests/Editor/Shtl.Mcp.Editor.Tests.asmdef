@@ -5,6 +5,6 @@
   "includePlatforms": ["Editor"],
   "overrideReferences": true,
   "precompiledReferences": ["nunit.framework.dll", "Newtonsoft.Json.dll"],
-  "defineConstraints": ["UNITY_INCLUDE_TESTS"],
+  "defineConstraints": ["UNITY_INCLUDE_TESTS", "SHTL_MCP_DEV"],
   "autoReferenced": false
 }

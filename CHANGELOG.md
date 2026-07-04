@@ -4,6 +4,15 @@ All notable changes to this package are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
 [SemVer](https://semver.org/).
 
+## [0.5.1] — 2026-07-04
+
+### Fixed
+- **Package tests no longer compile in consumer projects.** With the package embedded or referenced
+  via a local `file:` path (typical for dogfooding), Unity treats it as "in development" and compiled
+  `Shtl.Mcp.Editor.Tests` in the host — surfacing test compile errors there. The test assembly now
+  carries an extra `SHTL_MCP_DEV` define constraint, defined only in the dev TestProject; consumers
+  never see the tests regardless of install method.
+
 ## [0.5.0] — 2026-07-04
 
 Milestone **M5 — command-set v2**. Closes the practical gaps found while dogfooding on a production

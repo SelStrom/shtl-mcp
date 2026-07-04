@@ -4,7 +4,7 @@ Self-contained **MCP (Model Context Protocol) server embedded in the Unity Edito
 no external bridge process, no Node/Python. Gives LLM agents (Claude Code and other
 MCP-over-HTTP clients) JSON-RPC control over the running Unity instance.
 
-> Status: **M5 — command-set v2** (`0.5.0`). Full F1–F7 spec implemented (feature-complete):
+> Status: **M5 — command-set v2** (`0.5.1`). Full F1–F7 spec implemented (feature-complete):
 > 44 built-in tools + custom-tool extension point. M5 closes the practical gaps found while
 > dogfooding on a production project (write assets/code, component lifecycle, bulk/asset
 > inspector edits, reflection calls, multi-scene, per-camera capture).
@@ -89,7 +89,7 @@ broken tool is skipped with a console warning without stopping the server. `proj
 client to refresh its tool list. Working example: `TestProject~/Assets/Editor/HostMcpTools/`.
 
 ## Tools
-35 built-in tools; the live list (with schemas) comes from `tools/list` after connecting.
+44 built-in tools; the live list (with schemas) comes from `tools/list` after connecting.
 
 | Category | Tools |
 |----------|-------|
@@ -112,7 +112,10 @@ watchdog that re-binds if needed.
 ## Development
 This repository **is** the package (canonical UPM layout: `package.json`, `Editor/`,
 `Tests/` at the root). The dev/test Unity project lives in `TestProject~/` and
-references the package via `file:../../` + `testables`. Run EditMode tests:
+references the package via `file:../../` + `testables`. The test assembly is
+additionally gated by the `SHTL_MCP_DEV` scripting define (set in TestProject~'s
+Player settings) so package tests never compile in consumer projects — even when
+the package is embedded or referenced by a local `file:` path. Run EditMode tests:
 
 ```bash
 UNITY="/Applications/Unity/Hub/Editor/2022.3.62f3/Unity.app/Contents/MacOS/Unity"
