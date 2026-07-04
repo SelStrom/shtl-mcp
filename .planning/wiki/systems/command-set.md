@@ -20,12 +20,18 @@ art (CoderGamester/mcp-unity, IvanMurzak/Unity-MCP, CoplayDev/unity-mcp) и сж
 Легенда: ⏳ = async-job (возвращает `jobId`, опрос через `get_job`).
 Все инструменты работают в Edit и Play (см. `lifecycle-and-reload.md`, AC4.5).
 
-## Core v1 (~20 инструментов)
+## Core (44 инструмента: v1 + M5 command-set v2)
+
+M5 (command-set v2, murzak-parity) добавил 9 инструментов и расширил 2 по итогам
+аудита замены murzak в PerfectWar: частые операции, для которых escape hatch
+объективно неудобен (`run_csharp` выключен по умолчанию). F3/AC3.9–3.14.
 
 ### Контроль и идентичность
 | Инструмент | Назначение |
 |---|---|
 | `status` | Идентичность инстанса (projectName/path/version/port/pid), mode, isCompiling, health, uptimeSeconds. Якорь «какой инстанс + жив ли». Наблюдаемость re-spawn (F4/AC4.7): `reloadCount` (пережитых domain reload за сессию, durable) + `listenerUptimeSeconds` (время текущего listener'а, сбрасывается при re-spawn). |
+| `ping` | Bg-liveness (F4/AC4.8): отвечает с фонового потока, даже когда главный поток заблокирован (модал/компиляция) — отличает подвисший главный поток от мёртвого сервера. |
+| `get_config` | Снимок конфига (port range, heartbeat, footgun-флаг, keepalive) — диагностика (F2). |
 | `set_play_mode(playing)` ⏳ | Войти/выйти из Play. |
 | `recompile` ⏳ | Принудительная перекомпиляция скриптов. |
 | `get_job(jobId)` | Опрос статуса/результата async-job. |
@@ -38,6 +44,7 @@ art (CoderGamester/mcp-unity, IvanMurzak/Unity-MCP, CoplayDev/unity-mcp) и сж
 | `refresh_assets` ⏳ | `AssetDatabase.Refresh`. |
 | `find_assets(filter)` | Поиск/листинг ассетов. |
 | `read_asset(path)` | Сериализованные данные ассета. |
+| `write_asset(path, content, refresh?, createFolders?)` ⏳ | Создание/перезапись текстового ассета под `Assets/` — парный к `read_asset` (AC3.9). Для компилируемых (`.cs`/`.asmdef`/`.asmref`) при `refresh` — async-job (jobId; ошибки компиляции через `get_job`), остальные — синхронно. Обычный тул, не footgun. |
 | `move_asset` / `delete_asset` / `create_folder` | CRUD по AssetDatabase. |
 
 ### Префабы
@@ -50,19 +57,25 @@ art (CoderGamester/mcp-unity, IvanMurzak/Unity-MCP, CoplayDev/unity-mcp) и сж
 | `find_gameobject(query)` | Поиск GameObject. |
 | `gameobject_create / gameobject_modify / gameobject_destroy` | CRUD GameObject. |
 | `set_parent(child, parent)` | Репарентинг. |
-| `get_object(ref)` / `modify_object(ref, changes)` | Обобщённое чтение/запись через `SerializedObject` — компактно покрывает компоненты и поля (вместо россыпи component_*). |
+| `add_component(target, type)` / `remove_component(target, type, index?)` | Жизненный цикл компонента (AC3.10) — дополняет `modify_object` (тот пишет свойства, но не создаёт/не удаляет компонент). Тип не найден → ошибка со списком-подсказкой; `DisallowMultipleComponent`/`RequireComponent` — внятная ошибка. |
+| `get_object(ref)` / `modify_object(ref, changes)` | Обобщённое чтение/запись через `SerializedObject` — компактно покрывает компоненты и поля (вместо россыпи component_*). M5 (AC3.11): bulk-массив изменений + вложенные пути (`m_Size.x`) в одной транзакции; target — scene-GO, asset-path или instanceId (ScriptableObject/материал/конфиг); настраиваемая глубина чтения. |
 | `open_scene(path)` / `save_scene` | Сцены. |
+| `list_scenes` / `create_scene` / `unload_scene` / `set_active_scene` | Multi-scene (AC3.13): открытые сцены (path/isLoaded/isActive/isDirty), создание (опц. сохранение в asset), выгрузка, активная сцена. Аддитивные сценарии поверх `open_scene`/`save_scene`. |
 | `get_selection` / `set_selection` | Выделение в Editor. |
 
 ### Тесты
 | `run_tests(mode, filter)` ⏳ | EditMode/PlayMode тесты → результаты. |
+
+### Reflection (AC3.12)
+| `call_method(type, method, parameterTypes?, args?, target?, assembly?)` | Вызов существующего C#-метода (static/instance, вкл. private) по типу и сигнатуре. Обычный тул, не footgun: вызов существующего метода безопаснее компиляции произвольного кода (`run_csharp`). |
+| `find_method(type, nameContains?)` | Найти сигнатуры методов типа — выбор перегрузки перед `call_method`. |
 
 ### Escape hatches
 | `execute_menu_item(path)` | Исполнить любой `MenuItem`. |
 | `run_csharp(code)` | Скомпилировать и выполнить произвольный Editor-C#; вернуть результат/ошибки. Включаемо конфигом (footgun). |
 
 ### Зрение
-| `screenshot(view = game \| scene)` | Кадр Game/Scene View как изображение — модель «видит» результат. |
+| `screenshot(view = game \| scene, camera?)` | Кадр Game/Scene View как изображение — модель «видит» результат. `camera` (AC3.14) — кадр конкретной камеры по имени/пути GO, приоритетнее `view`. |
 
 ## Контракт инструмента
 - JSON-схема параметров + человекочитаемое описание в `tools/list` (AC3.4).
@@ -93,6 +106,8 @@ Host-проект расширяет тулсет **без форка**: кла�
 - Новый тул виден клиенту после reconnect (`notifications/tools/list_changed` не шлём —
   клиенты и так переподключаются). Файл вне Editor-сборки TypeCache не увидит.
 
-## v2 / опционально (достижимо через escape hatches)
-Профайлер, packages CRUD, материалы/шейдеры-специфика, reflection-API,
-isolated/camera-screenshot, `resources/*` MCP, SSE-стрим прогресса/логов.
+## Опционально / длинный хвост (достижимо через escape hatches)
+Профайлер, packages CRUD, материалы/шейдеры-специфика, isolated-screenshot,
+`type-get-json-schema`, built-in-ресурсы, `resources/*` MCP, SSE-стрим
+прогресса/логов. Частая нужда в одном из них у конкретного хоста → host custom
+tool (`[McpTool]`, AC3.6), не расширение ядра.

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
@@ -85,13 +86,75 @@ namespace Shtl.Mcp.Tools
         }
     }
 
-    /// Компоненты объекта + их top-level serialized-свойства со значениями.
+    /// Резолв Unity Object по ссылке: scene-GO (путь/имя) → asset-path (Assets/, Packages/) → instanceId
+    /// (число или числовая строка). Обобщение target'а get_object/modify_object на ассеты (AC3.11).
+    internal static class ObjectRefs
+    {
+        public static UnityEngine.Object Resolve(JToken target, out string error)
+        {
+            error = null;
+            if (target == null || target.Type == JTokenType.Null)
+            {
+                error = "target is required";
+                return null;
+            }
+            if (target.Type == JTokenType.Integer)
+            {
+                return ById((long)target, out error);
+            }
+            var s = (string)target;
+            if (string.IsNullOrEmpty(s))
+            {
+                error = "target is required";
+                return null;
+            }
+            if (s.StartsWith("Assets/", StringComparison.Ordinal) || s.StartsWith("Packages/", StringComparison.Ordinal))
+            {
+                var byPath = AssetDatabase.LoadMainAssetAtPath(s);
+                if (byPath == null)
+                {
+                    error = "no asset at path: " + s;
+                }
+                return byPath;
+            }
+            var go = SceneObjects.Resolve(s);
+            if (go != null)
+            {
+                return go;
+            }
+            if (long.TryParse(s, out var id))
+            {
+                return ById(id, out error);
+            }
+            error = "target not found: " + s;
+            return null;
+        }
+
+        static UnityEngine.Object ById(long id, out string error)
+        {
+            error = null;
+            var obj = EditorUtility.InstanceIDToObject((int)id);
+            if (obj == null)
+            {
+                error = "no object with instanceId " + id;
+            }
+            return obj;
+        }
+    }
+
+    /// Serialized-свойства объекта (AC3.11): scene-GO → по компонентам; ассет/instanceId (ScriptableObject,
+    /// материал, конфиг) → собственные свойства. Вложенные структуры/массивы — до maxDepth, с бюджетом ответа.
     public sealed class GetObjectTool : ITool
     {
-        const int PropCap = 40;
+        const int TopCap = 40;   // top-level свойств на компонент/объект
+        const int ArrayCap = 25; // элементов массива на свойство
+        const int Budget = 600;  // всего значений в ответе
 
         public string Name => "get_object";
-        public string Description => "Inspect a GameObject's components and their serialized properties (by path or name).";
+        public string Description =>
+            "Inspect serialized properties. Target: scene GameObject (path/name), asset path ('Assets/...') " +
+            "or instanceId. GameObject → per-component properties; other objects (ScriptableObject, material, " +
+            "config) → own properties. 'maxDepth' expands nested structs/arrays (default 2).";
         public bool NeedsMainThread => true;
 
         public JObject InputSchema => new JObject
@@ -99,53 +162,135 @@ namespace Shtl.Mcp.Tools
             ["type"] = "object",
             ["properties"] = new JObject
             {
-                ["target"] = new JObject { ["type"] = "string", ["description"] = "GameObject path or name." }
+                ["target"] = new JObject
+                {
+                    ["type"] = new JArray { "string", "integer" },
+                    ["description"] = "GameObject path/name, asset path, or instanceId."
+                },
+                ["maxDepth"] = new JObject { ["type"] = "integer", ["description"] = "Nesting depth for structs/arrays (default 2)." }
             },
             ["required"] = new JArray { "target" }
         };
 
         public JObject Invoke(JObject args)
         {
-            var go = SceneObjects.Resolve((string)args["target"]);
-            if (go == null)
+            var obj = ObjectRefs.Resolve(args["target"], out var err);
+            if (obj == null)
             {
-                return new JObject { ["error"] = "target not found: " + (string)args["target"] };
+                return new JObject { ["error"] = err };
+            }
+            int maxDepth = args["maxDepth"] != null ? (int)args["maxDepth"] : 2;
+            int budget = Budget;
+
+            if (obj is GameObject go)
+            {
+                var comps = new JArray();
+                foreach (var c in go.GetComponents<Component>())
+                {
+                    if (c == null)
+                    {
+                        continue;
+                    }
+                    comps.Add(new JObject
+                    {
+                        ["type"] = c.GetType().Name,
+                        ["instanceId"] = c.GetInstanceID(),
+                        ["properties"] = Props(c, maxDepth, ref budget)
+                    });
+                }
+                return new JObject
+                {
+                    ["path"] = SceneObjects.PathOf(go),
+                    ["instanceId"] = go.GetInstanceID(),
+                    ["components"] = comps,
+                    ["truncated"] = budget <= 0
+                };
             }
 
-            var comps = new JArray();
-            foreach (var c in go.GetComponents<Component>())
+            var o = new JObject
             {
-                if (c == null)
-                {
-                    continue;
-                }
-                var props = new JObject();
-                var so = new SerializedObject(c);
-                var it = so.GetIterator();
-                bool more = it.NextVisible(true);
-                int n = 0;
-                while (more && n < PropCap)
-                {
-                    if (it.name != "m_Script")
-                    {
-                        props[it.name] = SerializedValues.Read(it);
-                        n++;
-                    }
-                    more = it.NextVisible(false);
-                }
-                comps.Add(new JObject { ["type"] = c.GetType().Name, ["properties"] = props });
+                ["name"] = obj.name,
+                ["type"] = obj.GetType().Name,
+                ["instanceId"] = obj.GetInstanceID(),
+                ["properties"] = Props(obj, maxDepth, ref budget),
+                ["truncated"] = budget <= 0
+            };
+            var assetPath = AssetDatabase.GetAssetPath(obj);
+            if (!string.IsNullOrEmpty(assetPath))
+            {
+                o["assetPath"] = assetPath;
             }
-            return new JObject { ["path"] = SceneObjects.PathOf(go), ["components"] = comps };
+            return o;
+        }
+
+        static JObject Props(UnityEngine.Object host, int maxDepth, ref int budget)
+        {
+            var props = new JObject();
+            var so = new SerializedObject(host);
+            var it = so.GetIterator();
+            bool more = it.NextVisible(true);
+            int n = 0;
+            while (more && n < TopCap && budget > 0)
+            {
+                if (it.name != "m_Script")
+                {
+                    props[it.name] = ReadTree(it, 1, maxDepth, ref budget);
+                    n++;
+                }
+                more = it.NextVisible(false);
+            }
+            return props;
+        }
+
+        static JToken ReadTree(SerializedProperty p, int depth, int maxDepth, ref int budget)
+        {
+            budget--;
+            if (p.propertyType == SerializedPropertyType.Generic && depth < maxDepth)
+            {
+                if (p.isArray)
+                {
+                    var arr = new JArray();
+                    int n = Math.Min(p.arraySize, ArrayCap);
+                    for (int i = 0; i < n && budget > 0; i++)
+                    {
+                        arr.Add(ReadTree(p.GetArrayElementAtIndex(i), depth + 1, maxDepth, ref budget));
+                    }
+                    if (p.arraySize > n)
+                    {
+                        arr.Add("… +" + (p.arraySize - n) + " more");
+                    }
+                    return arr;
+                }
+                var o = new JObject();
+                var child = p.Copy();
+                var end = p.GetEndProperty();
+                bool enter = child.NextVisible(true);
+                while (enter && !SerializedProperty.EqualContents(child, end) && budget > 0)
+                {
+                    o[child.name] = ReadTree(child, depth + 1, maxDepth, ref budget);
+                    enter = child.NextVisible(false);
+                }
+                return o;
+            }
+            if (p.propertyType == SerializedPropertyType.Generic && p.isArray)
+            {
+                return "array[" + p.arraySize + "]"; // глубина исчерпана
+            }
+            return SerializedValues.Read(p);
         }
     }
 
-    /// Записать serialized-свойство компонента через SerializedObject.
+    /// Записать serialized-свойства через SerializedObject (AC3.11): одиночная форма (component/property/
+    /// value) или bulk 'changes' с вложенными путями ('m_Size.x') — транзакционно (всё или ничего). Target —
+    /// scene-GO, asset-path или instanceId; правки ассетов сохраняются на диск.
     public sealed class ModifyObjectTool : ITool
     {
         public string Name => "modify_object";
         public string Description =>
-            "Set a serialized property on a component via SerializedObject. " +
-            "Args: target, component (type name), property (name), value.";
+            "Set serialized properties via SerializedObject. Target: scene GameObject (path/name), asset path " +
+            "or instanceId. Single form: component+property+value. Bulk form: 'changes' " +
+            "[{component?, property, value}, ...] applied as one transaction (all or nothing). Property paths " +
+            "may be nested: 'm_Size.x', 'items.Array.data[0]'. Omit 'component' for non-GameObject targets.";
         public bool NeedsMainThread => true;
 
         public JObject InputSchema => new JObject
@@ -153,47 +298,146 @@ namespace Shtl.Mcp.Tools
             ["type"] = "object",
             ["properties"] = new JObject
             {
-                ["target"] = new JObject { ["type"] = "string", ["description"] = "GameObject path or name." },
-                ["component"] = new JObject { ["type"] = "string", ["description"] = "Component type name, e.g. 'BoxCollider'." },
-                ["property"] = new JObject { ["type"] = "string", ["description"] = "Serialized property name, e.g. 'm_IsTrigger'." },
-                ["value"] = new JObject { ["description"] = "New value (int/bool/float/string/enum-index/[x,y,z]/[r,g,b,a])." }
+                ["target"] = new JObject
+                {
+                    ["type"] = new JArray { "string", "integer" },
+                    ["description"] = "GameObject path/name, asset path, or instanceId."
+                },
+                ["component"] = new JObject { ["type"] = "string", ["description"] = "Component type name (GameObject targets, single form), e.g. 'BoxCollider'." },
+                ["property"] = new JObject { ["type"] = "string", ["description"] = "Serialized property path, e.g. 'm_IsTrigger' or 'm_Size.x' (single form)." },
+                ["value"] = new JObject { ["description"] = "New value (int/bool/float/string/enum-index/[x,y,z]/[r,g,b,a]) (single form)." },
+                ["changes"] = new JObject { ["type"] = "array", ["description"] = "Bulk form: [{component?, property, value}, ...]." }
             },
-            ["required"] = new JArray { "target", "component", "property", "value" }
+            ["required"] = new JArray { "target" }
         };
 
         public JObject Invoke(JObject args)
         {
-            var go = SceneObjects.Resolve((string)args["target"]);
-            if (go == null)
+            var obj = ObjectRefs.Resolve(args["target"], out var resolveErr);
+            if (obj == null)
             {
-                return new JObject { ["error"] = "target not found: " + (string)args["target"] };
+                return new JObject { ["error"] = resolveErr };
             }
-            var comp = go.GetComponent((string)args["component"]);
-            if (comp == null)
+
+            var changes = new List<JObject>();
+            if (args["changes"] is JArray arr)
             {
-                return new JObject { ["error"] = "component not found: " + (string)args["component"] };
-            }
-            var so = new SerializedObject(comp);
-            var p = so.FindProperty((string)args["property"]);
-            if (p == null)
-            {
-                return new JObject { ["error"] = "property not found: " + (string)args["property"] };
-            }
-            try
-            {
-                if (!SerializedValues.Write(p, args["value"]))
+                foreach (var c in arr)
                 {
-                    return new JObject { ["error"] = "unsupported property type for write: " + p.propertyType };
+                    if (!(c is JObject co) || co["property"] == null || co["value"] == null)
+                    {
+                        return new JObject { ["error"] = "each change needs 'property' and 'value'" };
+                    }
+                    changes.Add(co);
                 }
             }
-            catch (Exception e)
+            else if (args["property"] != null && args["value"] != null)
             {
-                // value не подходит под тип проперти (строка для int, короткий массив для Vector и т.п.)
-                return new JObject { ["error"] = "value does not match property type " + p.propertyType + ": " + e.Message };
+                changes.Add(new JObject { ["component"] = args["component"], ["property"] = args["property"], ["value"] = args["value"] });
             }
-            so.ApplyModifiedProperties();
-            SceneObjects.MarkDirty(go);
-            return new JObject { ["modified"] = true, ["property"] = (string)args["property"], ["value"] = SerializedValues.Read(p) };
+            if (changes.Count == 0)
+            {
+                return new JObject { ["error"] = "provide 'changes' array or component+property+value" };
+            }
+
+            // Фаза 1: зарезолвить все хосты и свойства ДО записи — транзакционность (всё или ничего).
+            var sos = new Dictionary<UnityEngine.Object, SerializedObject>();
+            var writes = new List<(SerializedProperty prop, JToken value, string path)>();
+            foreach (var c in changes)
+            {
+                var host = ResolveHost(obj, (string)c["component"], out var err);
+                if (host == null)
+                {
+                    return new JObject { ["error"] = err };
+                }
+                if (!sos.TryGetValue(host, out var so))
+                {
+                    so = new SerializedObject(host);
+                    sos[host] = so;
+                }
+                var propPath = (string)c["property"];
+                var p = so.FindProperty(propPath);
+                if (p == null)
+                {
+                    return new JObject { ["error"] = "property not found: " + propPath };
+                }
+                writes.Add((p, c["value"], propPath));
+            }
+
+            // Фаза 2: записать всё; ошибка → ApplyModifiedProperties не вызывается ни для одного хоста.
+            foreach (var w in writes)
+            {
+                try
+                {
+                    if (!SerializedValues.Write(w.prop, w.value))
+                    {
+                        return new JObject { ["error"] = "unsupported property type for write: " + w.prop.propertyType + " (" + w.path + ")" };
+                    }
+                }
+                catch (Exception e)
+                {
+                    // value не подходит под тип проперти (строка для int, короткий массив для Vector и т.п.)
+                    return new JObject { ["error"] = "value does not match property type " + w.prop.propertyType + " (" + w.path + "): " + e.Message };
+                }
+            }
+
+            foreach (var kv in sos)
+            {
+                kv.Value.ApplyModifiedProperties();
+                PersistDirty(kv.Key);
+            }
+
+            var results = new JArray();
+            foreach (var w in writes)
+            {
+                results.Add(new JObject { ["property"] = w.path, ["value"] = SerializedValues.Read(w.prop) });
+            }
+            var res = new JObject { ["modified"] = true, ["applied"] = writes.Count, ["results"] = results };
+            if (writes.Count == 1)
+            {
+                // совместимость одиночной формы
+                res["property"] = writes[0].path;
+                res["value"] = SerializedValues.Read(writes[0].prop);
+            }
+            return res;
+        }
+
+        static UnityEngine.Object ResolveHost(UnityEngine.Object target, string component, out string error)
+        {
+            error = null;
+            if (target is GameObject go)
+            {
+                if (string.IsNullOrEmpty(component))
+                {
+                    error = "component is required for GameObject targets";
+                    return null;
+                }
+                var comp = go.GetComponents<Component>().FirstOrDefault(c =>
+                    c != null && (c.GetType().Name == component || c.GetType().FullName == component));
+                if (comp == null)
+                {
+                    error = "component not found: " + component;
+                }
+                return comp;
+            }
+            if (!string.IsNullOrEmpty(component))
+            {
+                error = "'component' applies to GameObject targets only (target is " + target.GetType().Name + ")";
+                return null;
+            }
+            return target;
+        }
+
+        static void PersistDirty(UnityEngine.Object host)
+        {
+            var go = host as GameObject ?? (host as Component)?.gameObject;
+            if (go != null && go.scene.IsValid())
+            {
+                EditorSceneManager.MarkSceneDirty(go.scene);
+                return;
+            }
+            EditorUtility.SetDirty(host);
+            AssetDatabase.SaveAssetIfDirty(host); // правка ассета видна на диске сразу (верифицируема read_asset'ом)
         }
     }
 

@@ -14,6 +14,7 @@ namespace Shtl.Mcp.Tools
         public string Name => "screenshot";
         public string Description =>
             "Capture the Game or Scene view as a PNG image (view: 'game' | 'scene', default 'game'). " +
+            "Optional 'camera' (GameObject path or name with a Camera) captures that specific camera instead. " +
             "Optional width/height (default 1024x576).";
         public bool NeedsMainThread => true;
 
@@ -23,6 +24,7 @@ namespace Shtl.Mcp.Tools
             ["properties"] = new JObject
             {
                 ["view"] = new JObject { ["type"] = "string", ["description"] = "'game' (Camera.main) or 'scene' (Scene view)." },
+                ["camera"] = new JObject { ["type"] = "string", ["description"] = "GameObject path or name with a Camera component; takes priority over 'view' (AC3.14)." },
                 ["width"] = new JObject { ["type"] = "integer", ["description"] = "Image width (default 1024)." },
                 ["height"] = new JObject { ["type"] = "integer", ["description"] = "Image height (default 576)." }
             }
@@ -35,7 +37,22 @@ namespace Shtl.Mcp.Tools
             int h = Mathf.Clamp(args["height"] != null ? (int)args["height"] : 576, 16, MaxDim);
 
             Camera cam;
-            if (view == "scene")
+            var camName = (string)args["camera"];
+            if (!string.IsNullOrEmpty(camName))
+            {
+                var go = SceneObjects.Resolve(camName);
+                if (go == null)
+                {
+                    return new JObject { ["error"] = "camera GameObject not found: " + camName };
+                }
+                cam = go.GetComponent<Camera>();
+                if (cam == null)
+                {
+                    return new JObject { ["error"] = "no Camera component on: " + SceneObjects.PathOf(go) };
+                }
+                view = "camera '" + go.name + "'";
+            }
+            else if (view == "scene")
             {
                 var sv = SceneView.lastActiveSceneView;
                 cam = sv != null ? sv.camera : null;

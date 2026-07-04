@@ -105,6 +105,7 @@ namespace Shtl.Mcp.Lifecycle
             _tools.Register(new RefreshAssetsTool(_jobs, () => ReloadCount));
             _tools.Register(new FindAssetsTool());
             _tools.Register(new ReadAssetTool());
+            _tools.Register(new WriteAssetTool(_jobs, () => ReloadCount));
             _tools.Register(new MoveAssetTool());
             _tools.Register(new DeleteAssetTool());
             _tools.Register(new CreateFolderTool());
@@ -119,16 +120,24 @@ namespace Shtl.Mcp.Lifecycle
             _tools.Register(new GameObjectModifyTool());
             _tools.Register(new GameObjectDestroyTool());
             _tools.Register(new SetParentTool());
+            _tools.Register(new AddComponentTool());
+            _tools.Register(new RemoveComponentTool());
             _tools.Register(new GetObjectTool());
             _tools.Register(new ModifyObjectTool());
             _tools.Register(new OpenSceneTool());
             _tools.Register(new SaveSceneTool());
+            _tools.Register(new ListScenesTool());
+            _tools.Register(new CreateSceneTool());
+            _tools.Register(new UnloadSceneTool());
+            _tools.Register(new SetActiveSceneTool());
             _tools.Register(new GetSelectionTool());
             _tools.Register(new SetSelectionTool());
             _tools.Register(new ScreenshotTool());
             _tools.Register(new GetConfigTool(ConfigSnapshot));
             _tools.Register(new ExecuteMenuItemTool());
             _tools.Register(new RunCsharpTool(() => ShtlMcpConfig.AllowRunCsharp));
+            _tools.Register(new CallMethodTool());
+            _tools.Register(new FindMethodTool());
             // F3/AC3.6: кастомные тулы хоста ([McpTool]) — ПОСЛЕ встроенных. Один раз на инстанс: на bind-retry
             // (порт занят) EnsureStarted перезапускается тем же инстансом, а _tools уже содержит кастомные →
             // повторный дискавери спамил бы «имя занято». Новый инстанс (domain reload) сбросит флаг и пере-обнаружит.

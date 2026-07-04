@@ -4,8 +4,10 @@ Self-contained **MCP (Model Context Protocol) server embedded in the Unity Edito
 no external bridge process, no Node/Python. Gives LLM agents (Claude Code and other
 MCP-over-HTTP clients) JSON-RPC control over the running Unity instance.
 
-> Status: **M4 — spec completion + reliability** (`0.4.0`). Full F1–F7 spec implemented
-> (feature-complete): 35 built-in tools + custom-tool extension point.
+> Status: **M5 — command-set v2** (`0.5.0`). Full F1–F7 spec implemented (feature-complete):
+> 44 built-in tools + custom-tool extension point. M5 closes the practical gaps found while
+> dogfooding on a production project (write assets/code, component lifecycle, bulk/asset
+> inspector edits, reflection calls, multi-scene, per-camera capture).
 > See [CHANGELOG](CHANGELOG.md) for the history.
 
 ## Requirements
@@ -93,10 +95,12 @@ client to refresh its tool list. Working example: `TestProject~/Assets/Editor/Ho
 |----------|-------|
 | Diagnostics | `status`, `ping` (answers even when the main thread is blocked), `get_logs`, `clear_logs`, `get_config`, `get_job` |
 | Lifecycle (reload-spanning jobs) | `recompile`, `set_play_mode`, `run_tests` (EditMode/PlayMode) |
-| Assets | `refresh_assets`, `find_assets`, `read_asset`, `move_asset`, `delete_asset`, `create_folder` |
+| Assets | `refresh_assets`, `find_assets`, `read_asset`, `write_asset` (text assets & scripts; compiled extensions go through the reload job, compile errors via `get_job`), `move_asset`, `delete_asset`, `create_folder` |
 | Prefabs | `create_prefab`, `open_prefab`, `save_prefab`, `close_prefab`, `instantiate_prefab` |
-| Scene & GameObjects | `open_scene`, `save_scene`, `get_hierarchy`, `find_gameobject`, `gameobject_create`, `gameobject_destroy`, `gameobject_modify`, `get_object`, `modify_object`, `set_parent`, `get_selection`, `set_selection` |
-| Capture | `screenshot` (Game/Scene view as MCP image content) |
+| Scenes (multi-scene) | `open_scene`, `save_scene`, `list_scenes`, `create_scene`, `unload_scene`, `set_active_scene` |
+| GameObjects & components | `get_hierarchy`, `find_gameobject`, `gameobject_create`, `gameobject_destroy`, `gameobject_modify`, `add_component`, `remove_component`, `get_object`, `modify_object` (bulk + nested property paths, targets scene objects / assets / instanceIds), `set_parent`, `get_selection`, `set_selection` |
+| Reflection | `call_method` (existing C# methods, static/instance incl. private), `find_method` (overload discovery) |
+| Capture | `screenshot` (Game/Scene view or a named camera, as MCP image content) |
 | Escape hatches | `execute_menu_item`, `run_csharp` (footgun-gated, human-only) |
 
 ## Reliability

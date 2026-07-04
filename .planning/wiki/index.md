@@ -84,6 +84,10 @@
   No-Throttling пока сервер включён (фон не заклинивает MCP+control-flag). `IdleKeepAlive` + проводка. Best-effort.
 - [m5-custom-tools](tasks/m5-custom-tools/TASK.md) — M5/v2: кастомные тулы host-проекта без форка (AC3.6–3.8);
   `[McpTool]` + `TypeCache`-дискавери `ITool`-классов. Research 5 Unity-MCP → hybrid (ITool + маркер, не авто-схема).
+- [m5-command-set-v2](tasks/m5-command-set-v2/TASK.md) — M5: murzak-parity для догфудинга в PerfectWar
+  (AC3.9–3.14): `write_asset` (компилируемые → reload-job), `add/remove_component`, `get/modify_object`
+  (bulk+nested+asset-target), `call_method`/`find_method`, multi-scene ×4, `screenshot camera`.
+  44 встроенных тула; 46 новых тестов, вкл. reload-spanning e2e write_asset.
 
 ## Планы вех
 - [m2-plan](m2-plan.md) — декомпозиция M2 (полный тулсет + async-job + control-flag + config +

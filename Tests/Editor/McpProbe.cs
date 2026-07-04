@@ -15,14 +15,20 @@ namespace Shtl.Mcp.Editor.Tests
     /// главный поток заблокирован на сокете). Тест должен `yield`-ить, пока Task не завершится.
     internal static class McpProbe
     {
-        const string StatusCall =
-            "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\"," +
-            "\"params\":{\"name\":\"status\",\"arguments\":{}}}";
-
         /// POST status на http://127.0.0.1:port/. Тело ответа или исключение при сетевой ошибке
         /// (например, connection refused, пока листенер лежит) — гоняется на пуле потоков.
-        public static Task<string> CallStatusAsync(int port)
+        public static Task<string> CallStatusAsync(int port) => CallToolAsync(port, "status", null);
+
+        /// POST tools/call произвольного инструмента. Тело ответа или исключение — как CallStatusAsync.
+        public static Task<string> CallToolAsync(int port, string name, JObject arguments)
         {
+            var payload = new JObject
+            {
+                ["jsonrpc"] = "2.0",
+                ["id"] = 1,
+                ["method"] = "tools/call",
+                ["params"] = new JObject { ["name"] = name, ["arguments"] = arguments ?? new JObject() }
+            }.ToString(Newtonsoft.Json.Formatting.None);
             return Task.Run(() =>
             {
                 var req = (HttpWebRequest)WebRequest.Create($"http://127.0.0.1:{port}/");
@@ -33,7 +39,7 @@ namespace Shtl.Mcp.Editor.Tests
                 req.Timeout = 4000;
                 req.ReadWriteTimeout = 4000;
 
-                var bytes = Encoding.UTF8.GetBytes(StatusCall);
+                var bytes = Encoding.UTF8.GetBytes(payload);
                 using (var s = req.GetRequestStream())
                 {
                     s.Write(bytes, 0, bytes.Length);
@@ -45,6 +51,11 @@ namespace Shtl.Mcp.Editor.Tests
                 }
             });
         }
+
+        /// Полезная нагрузка любого инструмента из result.content[0].text (алиас TryGetStatus —
+        /// формат ответа один для всех tools/call).
+        public static bool TryGetToolPayload(string respJson, out JObject payload)
+            => TryGetStatus(respJson, out payload);
 
         /// Распарсить вложенный JSON статуса из result.content[0].text (тело status-инструмента).
         /// false, если ответ не похож на успешный status round-trip.

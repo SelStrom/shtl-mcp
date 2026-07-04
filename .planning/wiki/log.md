@@ -311,3 +311,18 @@ code (`McpToolAttribute`, `ToolDiscovery` с изоляцией ошибок + �
 проводка в `EnsureStarted`; всё в сборке Tools → DAG цел). +7 unit → **138/138**. E2e живого дискавери: пример
 `greet` в host-Editor-сборке `TestProject~` → tools/list=36, вызов работает, авто projectName/recoveryHint.
 Метод-атрибут+авто-схема и DI-контекст — v2.
+
+## [2026-07-04] forward | M5 — command-set v2 (murzak-parity) | m5-command-set-v2
+Вход — `.planning/M5-murzak-parity-prompt.md` (аудит замены murzak в PerfectWar). Открытые вопросы §7
+закрыл человек до code-diff: `write_asset`/`call_method` — обычные тулы (не footgun), объём P0+P1,
+`AllowRunCsharp` в хосте не включаем. Raw F3 **AC3.9–3.14** (+reflection-API поднят из v2-out-of-scope) →
+wiki `command-set.md` (Core=44, §v2 сокращён, drift ping/get_config закрыт) → code: `write_asset`
+(компилируемые расширения через reload-job-канал recompile, ошибки компиляции в `get_job`),
+`add/remove_component` (+`TypeResolve` с подсказками, пре-чеки RequireComponent/DisallowMultiple),
+`get/modify_object` (target scene-GO/asset-path/instanceId через `ObjectRefs`; bulk+nested транзакционно;
+`SaveAssetIfDirty`), `call_method`/`find_method`, multi-scene `list/create/unload/set_active_scene`
+(set_active идемпотентен — Unity возвращает false для уже-активной), `screenshot camera`. +46 тестов →
+**184/184**, вкл. reload-spanning e2e write_asset через реальный HTTP. Находки Unity: built-in базовые
+классы не abstract в C#-API; Rigidbody без managed DisallowMultiple (нативный enforce); editor-сборочный
+MonoBehaviour не добавляется компонентом; вторая untitled-сцена запрещена; NewScene(Additive) активирует
+новую сцену. Версия 0.5.0 (CHANGELOG: command-set v2 + ранее не релизнутые custom tools).

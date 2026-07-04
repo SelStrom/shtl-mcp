@@ -51,6 +51,43 @@ Unity: перекомпиляция, префабы, play/edit, ассеты, т
   зарегистрированные инструменты; механизм `[McpTool]` НЕ требует и не включает
   footgun-флаг `AllowRunCsharp` (в отличие от `run_csharp`).
 
+### Command-set v2 (M5 — murzak-parity для догфудинга)
+
+Расширения по итогам аудита замены murzak в боевом проекте (PerfectWar): частые
+операции, для которых escape hatch объективно неудобен (`run_csharp` — footgun,
+по умолчанию выключен). Философия тонкого ядра сохраняется: только частые
+операции, длинный хвост остаётся на escape hatches (см. Out of scope).
+
+- **AC3.9** — `write_asset`: создание/перезапись текстового ассета по пути под
+  `Assets/` (`.cs`, `.uxml`, `.uss`, `.json`, `.asmdef`, …) — парный к `read_asset`.
+  `refresh` (default true) импортирует записанное; для компилируемых расширений
+  (`.cs`/`.asmdef`/`.asmref`) — async-job как у `refresh_assets`: `jobId`, ошибки
+  компиляции доставляются через `get_job` (файл/строка/сообщение). **Обычный тул,
+  не footgun** (решение человека): запись кода отделена от ad-hoc исполнения
+  (`run_csharp`); модель и так пишет код через файловую систему.
+- **AC3.10** — `add_component` / `remove_component`: жизненный цикл компонента
+  GameObject — дополняет `modify_object` (тот пишет свойства существующего
+  компонента, но не создаёт/не удаляет сам компонент). Тип — по полному имени;
+  тип не найден → структурированная ошибка со списком-подсказкой; конфликты
+  (`DisallowMultipleComponent`, удаление required по `RequireComponent`) —
+  внятная ошибка, не глотать.
+- **AC3.11** — расширение `get_object`/`modify_object`: (а) `modify_object`
+  принимает массив изменений и вложенные пути свойств (`m_Size.x`) в одной
+  транзакции `SerializedObject`; (б) target — не только scene-GO, но и Unity
+  Object по asset-path или instanceId (ScriptableObject, материал, конфиг);
+  (в) `get_object` отдаёт компоненты и сериализованные свойства достаточно
+  глубоко для верификации состояния.
+- **AC3.12** — `call_method` + `find_method` (reflection): вызов существующего
+  C#-метода (static/instance, включая private) по типу и сигнатуре;
+  `find_method` возвращает найденные сигнатуры для выбора перегрузки.
+  **Обычный тул, не footgun** (решение человека): вызов существующего метода
+  безопаснее компиляции произвольного кода.
+- **AC3.13** — multi-scene: `list_scenes` (открытые сцены: path / isLoaded /
+  isActive / isDirty), `create_scene`, `unload_scene`, `set_active_scene` —
+  аддитивные многосценовые сценарии поверх `open_scene`/`save_scene`.
+- **AC3.14** — `screenshot` принимает `camera` (имя/путь GameObject с `Camera`):
+  кадр конкретной камеры, не только `game` (Camera.main) / `scene`.
+
 ## Out of scope (v2+, достижимо через escape hatches)
-- Профайлер, packages CRUD, материалы/шейдеры-специфика, reflection-API,
-  isolated-screenshot.
+- Профайлер, packages CRUD, материалы/шейдеры-специфика, isolated-screenshot,
+  `type-get-json-schema`, built-in-ресурсы.
