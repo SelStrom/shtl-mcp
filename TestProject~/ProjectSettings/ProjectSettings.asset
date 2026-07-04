@@ -162,7 +162,9 @@ PlayerSettings:
   resetResolutionOnWindowResize: 0
   androidSupportedAspectRatio: 1
   androidMaxAspectRatio: 2.1
-  applicationIdentifier: {}
+  applicationIdentifier:
+    Android: com.DefaultCompany.shtlmcp
+    Standalone: com.DefaultCompany.shtl-mcp
   buildNumber:
     Standalone: 0
     VisionOS: 0

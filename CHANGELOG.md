@@ -36,6 +36,16 @@ project as a replacement for `com.ivanmurzak.unity.mcp` (F3/AC3.9–3.14): 44 bu
 - **`screenshot` (AC3.14):** new `camera` parameter captures a specific camera by GameObject
   path/name (takes priority over `view`).
 
+### Fixed
+- **Dashboard layout & idle cost:** call tail rendered as aligned columns (✓/✗ | method with
+  ellipsis+tooltip | ms | HH:mm:ss) instead of one clipped label; rows rebuild only when the call set
+  changes and an idle dashboard repaints nothing per tick; uniform section spacing; ScrollView +
+  minSize (content no longer silently clips); the Reload Domain warning moved to the main area with a
+  Fix button (AC5.4) and Restart out of the collapsed Settings foldout (AC5.6) — both per the intent
+  mockup.
+- **Dashboard `claude` CLI runner:** stdout/stderr are drained before `WaitForExit` — child output
+  larger than the pipe buffer used to deadlock.
+
 ### Notes
 - 184 EditMode tests (46 new), including a reload-spanning `write_asset` e2e over real HTTP.
 - Long-tail items stay on escape hatches by design (F3): materials/shaders specifics, packages CRUD,
