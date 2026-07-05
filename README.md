@@ -100,7 +100,7 @@ client to refresh its tool list. Working example: `TestProject~/Assets/Editor/Ho
 | Scenes (multi-scene) | `open_scene`, `save_scene`, `list_scenes`, `create_scene`, `unload_scene`, `set_active_scene` |
 | GameObjects & components | `get_hierarchy`, `find_gameobject`, `gameobject_create`, `gameobject_destroy`, `gameobject_modify`, `add_component`, `remove_component`, `get_object`, `modify_object` (bulk + nested property paths, targets scene objects / assets / instanceIds), `set_parent`, `get_selection`, `set_selection` |
 | Reflection | `call_method` (existing C# methods, static/instance incl. private), `find_method` (overload discovery) |
-| Capture | `screenshot` (Game/Scene view or a named camera, as MCP image content) |
+| Capture | `screenshot` (Game/Scene view, a named camera, or `overlay:true` for the composited Screen-Space UI in Play mode — as MCP image content), `screenshot_uxml` (render a UXML asset to a PNG offscreen in Edit mode, no Play mode) |
 | Escape hatches | `execute_menu_item`, `run_csharp` (footgun-gated, human-only) |
 
 ## Reliability
