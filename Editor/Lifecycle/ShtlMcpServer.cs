@@ -133,6 +133,7 @@ namespace Shtl.Mcp.Lifecycle
             _tools.Register(new GetSelectionTool());
             _tools.Register(new SetSelectionTool());
             _tools.Register(new ScreenshotTool());
+            _tools.Register(new ScreenshotUxmlTool());
             _tools.Register(new GetConfigTool(ConfigSnapshot));
             _tools.Register(new ExecuteMenuItemTool());
             _tools.Register(new RunCsharpTool(() => ShtlMcpConfig.AllowRunCsharp));

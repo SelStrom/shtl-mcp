@@ -4,6 +4,16 @@ All notable changes to this package are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
 [SemVer](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **`screenshot_uxml`:** render a single UXML asset to a PNG entirely in **Edit mode** (no Play mode).
+  Builds a temporary offscreen UI Toolkit panel (`PanelSettings.targetTexture`), clones the UXML in,
+  forces the panel's layout + repaint via internal API, and reads back the `RenderTexture`. Styles come
+  from the UXML's own `<Style>` imports plus any `uss` paths passed in; `theme` auto-picks the first
+  project `ThemeStyleSheet` when omitted. Complements `screenshot overlay:true` (that captures the full
+  Play-mode backbuffer composite; this isolates and verifies one UXML's layout without entering Play).
+
 ## [0.5.1] — 2026-07-04
 
 ### Fixed
