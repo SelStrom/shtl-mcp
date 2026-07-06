@@ -42,6 +42,18 @@ namespace Shtl.Mcp.Lifecycle
         bool _customToolsDiscovered; // F3/AC3.6: дискавери кастомных — один раз на инстанс (не спамить на bind-retry)
         volatile string _serverName; // читается фоновым watchdog'ом → volatile
         RecoveryWatchdog _watchdog;  // фоновый поток восстановления (re-bind + control-flag + heartbeat)
+
+        // Снимок main-thread полей для bg-heartbeat: bg-поток не смеет трогать Application/EditorApplication,
+        // поэтому значения кэшируются на главном потоке (reload-stable — в EnsureStarted; mode/compiling — каждый
+        // главпоточный WatchdogTick). Держит registry.LastHeartbeat свежим при заблокированном main.
+        volatile string _hbProjectName;
+        volatile string _hbProjectPath;
+        volatile string _hbUnityVersion;
+        int _hbPid;
+        DateTime _hbStartedAt;
+        volatile RecoveryInfo _hbRecovery;
+        volatile string _hbMode = "edit";
+        volatile bool _hbCompiling;
         DateTime _lastRequestUtc = DateTime.MinValue;
         DateTime _listenerStartedUtc = DateTime.MinValue;
 
@@ -86,6 +98,15 @@ namespace Shtl.Mcp.Lifecycle
             Port = ResolvePort();
             _serverName = Shtl.Mcp.Common.ServerName.Resolve(Application.productName, ProjectPath,
                 name => _registry.LivePathForName(name, Ttl));
+
+            // Снимок reload-стабильных полей для bg-heartbeat (main-thread чтения — здесь, не в фоне).
+            _hbProjectName = Application.productName;
+            _hbProjectPath = ProjectPath;
+            _hbUnityVersion = Application.unityVersion;
+            _hbPid = System.Diagnostics.Process.GetCurrentProcess().Id;
+            _hbStartedAt = new DateTime(long.Parse(SessionState.GetString(StartedKey,
+                DateTime.UtcNow.Ticks.ToString())), DateTimeKind.Utc);
+            _hbRecovery = BuildRecovery(_hbPid);
 
             Application.logMessageReceivedThreaded -= OnLog;
             Application.logMessageReceivedThreaded += OnLog;
@@ -251,6 +272,8 @@ namespace Shtl.Mcp.Lifecycle
             CheckControlFlag(); // LLM-инициируемый форс-рестарт через ~/.unity-mcp/<serverName>.cmd (AC2.6)
             RunTestsTool.SweepOrphan(_jobs); // авто-fail зависшего/осиротевшего тест-прогона + вернуть троттлинг
             ReloadJobs.FinalizeOnTick(_jobs, ReloadCount); // завершить recompile/set_play_mode job после reload
+            _hbMode = EditorApplication.isPlaying ? "play" : "edit"; // refresh снимка для bg-heartbeat
+            _hbCompiling = EditorApplication.isCompiling;
             Heartbeat();
             // Повторно ПОСЛЕ SweepOrphan: если он снял маркер прогона и откатил no-throttle к Default, keepalive
             // переустанавливается в тот же тик (а не на следующем), закрывая 1-tick задержку re-assert (AC4.10).
@@ -329,6 +352,7 @@ namespace Shtl.Mcp.Lifecycle
         {
             TryReBindListener();
             CheckControlFlagBg();
+            HeartbeatBg();
         }
 
         // Снимок конфига для get_config (строится на главном потоке, читает EditorPrefs).
@@ -415,6 +439,37 @@ namespace Shtl.Mcp.Lifecycle
                         DateTime.UtcNow.Ticks.ToString())), DateTimeKind.Utc),
                     LastHeartbeat = DateTime.UtcNow,
                     Recovery = BuildRecovery(pid) // F7/AC7.1: durable самоописываемое восстановление
+                });
+            }
+            catch { }
+        }
+
+        // Bg-heartbeat: пишет registry из volatile-снимка (без EditorApplication.*). Держит LastHeartbeat
+        // свежим, пока главный поток заблокирован → registry не «хоронит» живой инстанс → его serverName/port
+        // не перехватит тёзка того же проекта под --scope user. Registry write сериализован файл-локом.
+        void HeartbeatBg()
+        {
+            var name = _serverName;
+            var http = _http;
+            if (string.IsNullOrEmpty(name) || http == null)
+            {
+                return;
+            }
+            try
+            {
+                _registry.Upsert(new InstanceEntry
+                {
+                    ProjectName = _hbProjectName,
+                    ProjectPath = _hbProjectPath,
+                    UnityVersion = _hbUnityVersion,
+                    ServerName = name,
+                    Port = Port,
+                    Pid = _hbPid,
+                    Mode = _hbMode,
+                    Compiling = _hbCompiling,
+                    StartedAt = _hbStartedAt,
+                    LastHeartbeat = DateTime.UtcNow,
+                    Recovery = _hbRecovery
                 });
             }
             catch { }
