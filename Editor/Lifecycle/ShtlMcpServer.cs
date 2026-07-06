@@ -38,9 +38,9 @@ namespace Shtl.Mcp.Lifecycle
         readonly RegistryStore _registry = new RegistryStore(RegistryPath);
         readonly CallTail _calls = new CallTail(20); // F5/AC5.5: хвост последних вызовов для дашборда
 
-        HttpServer _http;
+        volatile HttpServer _http; // читается фоновым watchdog'ом → volatile
         bool _customToolsDiscovered; // F3/AC3.6: дискавери кастомных — один раз на инстанс (не спамить на bind-retry)
-        string _serverName;
+        volatile string _serverName; // читается фоновым watchdog'ом → volatile
         DateTime _lastRequestUtc = DateTime.MinValue;
         DateTime _listenerStartedUtc = DateTime.MinValue;
 
@@ -177,14 +177,13 @@ namespace Shtl.Mcp.Lifecycle
 
             _http = new HttpServer(Port, router.Handle, () => _lastRequestUtc = DateTime.UtcNow);
             _http.Start();
-            if (!_http.IsListening)
+            // bind мог не удаться (порт ещё в TIME_WAIT) — _http НЕ обнуляем: объект с готовым router'ом
+            // остаётся, фоновый watchdog повторит _http.Start() до успеха (не зависит от update-loop).
+            if (_http.IsListening)
             {
-                // bind не удался (порт ещё занят) — сбрасываем, watchdog повторит на следующем тике
-                _http = null;
-                return;
+                _listenerStartedUtc = DateTime.UtcNow; // отметка re-spawn для listenerUptimeSeconds
+                Heartbeat();
             }
-            _listenerStartedUtc = DateTime.UtcNow; // отметка re-spawn для listenerUptimeSeconds
-            Heartbeat();
             IdleKeepAlive.Reconcile(ShtlMcpConfig.Enabled && ShtlMcpConfig.IdleKeepAlive); // AC4.10: применить сразу на старте/после reload
         }
 
@@ -201,6 +200,27 @@ namespace Shtl.Mcp.Lifecycle
         {
             StopListenerForReload();
             EnsureStarted();
+        }
+
+        /// Фоново-безопасный ре-бинд: только HttpListener.Start (без main-thread API). Смену ПОРТА здесь
+        /// НЕ делаем — это registry-aware ResolvePort на главном потоке (EnsureStarted). Тут лишь поднимаем
+        /// listener на уже выбранном порту. Возвращает текущее состояние прослушивания.
+        internal bool TryReBindListener()
+        {
+            var http = _http;
+            if (http == null)
+            {
+                return false; // ещё не сконструирован (до первого EnsureStarted) — поднимет main
+            }
+            if (!http.IsListening)
+            {
+                http.Start();
+                if (http.IsListening)
+                {
+                    _listenerStartedUtc = DateTime.UtcNow;
+                }
+            }
+            return http.IsListening;
         }
 
         public void WatchdogTick()
