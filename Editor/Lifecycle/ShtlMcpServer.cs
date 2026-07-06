@@ -193,7 +193,7 @@ namespace Shtl.Mcp.Lifecycle
 
         public void StopListenerForReload()
         {
-            _http?.Stop();
+            _http?.Abort();
             _http = null;
         }
 
