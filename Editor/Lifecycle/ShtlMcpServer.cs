@@ -41,6 +41,7 @@ namespace Shtl.Mcp.Lifecycle
         volatile HttpServer _http; // читается фоновым watchdog'ом → volatile
         bool _customToolsDiscovered; // F3/AC3.6: дискавери кастомных — один раз на инстанс (не спамить на bind-retry)
         volatile string _serverName; // читается фоновым watchdog'ом → volatile
+        RecoveryWatchdog _watchdog;  // фоновый поток восстановления (re-bind + control-flag + heartbeat)
         DateTime _lastRequestUtc = DateTime.MinValue;
         DateTime _listenerStartedUtc = DateTime.MinValue;
 
@@ -185,6 +186,12 @@ namespace Shtl.Mcp.Lifecycle
                 Heartbeat();
             }
             IdleKeepAlive.Reconcile(ShtlMcpConfig.Enabled && ShtlMcpConfig.IdleKeepAlive); // AC4.10: применить сразу на старте/после reload
+
+            if (_watchdog == null)
+            {
+                _watchdog = new RecoveryWatchdog(WatchdogBgTick, 1000);
+                _watchdog.Start();
+            }
         }
 
         /// AC4.10: применить idle-keepalive немедленно (зовётся дашбордом после смены тогла).
@@ -192,6 +199,8 @@ namespace Shtl.Mcp.Lifecycle
 
         public void StopListenerForReload()
         {
+            _watchdog?.Stop();
+            _watchdog = null;
             _http?.Abort();
             _http = null;
         }
@@ -279,6 +288,47 @@ namespace Shtl.Mcp.Lifecycle
             {
                 RestartNow();
             }
+        }
+
+        // Фоновый вариант control-flag: читает+удаляет файл и, при "restart", ре-биндит listener напрямую
+        // (Abort+Start) — БЕЗ EnsureStarted, т.к. полный setup требует главного потока. Полный рестарт с
+        // ре-регистрацией тулов остаётся за EnsureStarted на главном потоке (следующий Init/afterReload).
+        internal void CheckControlFlagBg()
+        {
+            var name = _serverName;
+            if (string.IsNullOrEmpty(name))
+            {
+                return;
+            }
+            var cmdPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(RegistryPath), name + ".cmd");
+            if (!System.IO.File.Exists(cmdPath))
+            {
+                return;
+            }
+            string cmd;
+            try
+            {
+                cmd = System.IO.File.ReadAllText(cmdPath).Trim();
+                System.IO.File.Delete(cmdPath);
+            }
+            catch
+            {
+                return;
+            }
+            if (cmd == "restart")
+            {
+                var http = _http;
+                http?.Abort();
+                http?.Start(); // тот же порт; при неуспехе следующий тик TryReBindListener добьёт
+            }
+        }
+
+        // Один тик фонового восстановления (вне главного потока): поднять listener + исполнить restart-флаг.
+        // Heartbeat добавляется в Task 5. Порт/имя здесь не меняем — только liveness на уже выбранном порту.
+        void WatchdogBgTick()
+        {
+            TryReBindListener();
+            CheckControlFlagBg();
         }
 
         // Снимок конфига для get_config (строится на главном потоке, читает EditorPrefs).

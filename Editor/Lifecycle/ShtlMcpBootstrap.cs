@@ -62,6 +62,9 @@ namespace Shtl.Mcp.Lifecycle
             }
 
             _lastTick = now;
+            // Главпоточный watchdog остаётся для main-only задач (job finalize, orphan sweep, keepalive).
+            // Ре-бинд listener'а и control-flag теперь дублирует фоновый RecoveryWatchdog (оба идемпотентны),
+            // поэтому восстановление больше НЕ зависит от того, тикает ли update.
             ShtlMcpServer.Instance.WatchdogTick();
         }
     }
