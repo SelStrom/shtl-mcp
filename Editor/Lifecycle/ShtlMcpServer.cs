@@ -206,7 +206,7 @@ namespace Shtl.Mcp.Lifecycle
                 _listenerStartedUtc = DateTime.UtcNow; // отметка re-spawn для listenerUptimeSeconds
                 Heartbeat();
             }
-            IdleKeepAlive.Reconcile(ShtlMcpConfig.Enabled && ShtlMcpConfig.IdleKeepAlive); // AC4.10: применить сразу на старте/после reload
+            IdleKeepAlive.Reconcile(WantKeepAlive(ShtlMcpConfig.Enabled, ShtlMcpConfig.IdleKeepAlive, LastRequestAgeSeconds)); // AC4.10: применить сразу на старте/после reload
 
             if (_watchdog == null)
             {
@@ -216,7 +216,7 @@ namespace Shtl.Mcp.Lifecycle
         }
 
         /// AC4.10: применить idle-keepalive немедленно (зовётся дашбордом после смены тогла).
-        public void SyncKeepAlive() => IdleKeepAlive.Reconcile(ShtlMcpConfig.Enabled && ShtlMcpConfig.IdleKeepAlive);
+        public void SyncKeepAlive() => IdleKeepAlive.Reconcile(WantKeepAlive(ShtlMcpConfig.Enabled, ShtlMcpConfig.IdleKeepAlive, LastRequestAgeSeconds));
 
         public void StopListenerForReload()
         {
@@ -257,7 +257,7 @@ namespace Shtl.Mcp.Lifecycle
         {
             // AC4.10: держать full-rate update в фоне (или отпустить, если выключено) — ДО enabled-гейта,
             // чтобы при выключенном сервере троттлинг вернулся к Default.
-            IdleKeepAlive.Reconcile(ShtlMcpConfig.Enabled && ShtlMcpConfig.IdleKeepAlive);
+            IdleKeepAlive.Reconcile(WantKeepAlive(ShtlMcpConfig.Enabled, ShtlMcpConfig.IdleKeepAlive, LastRequestAgeSeconds));
             if (!ShtlMcpConfig.Enabled)
             {
                 StopListenerForReload();
@@ -277,7 +277,7 @@ namespace Shtl.Mcp.Lifecycle
             Heartbeat();
             // Повторно ПОСЛЕ SweepOrphan: если он снял маркер прогона и откатил no-throttle к Default, keepalive
             // переустанавливается в тот же тик (а не на следующем), закрывая 1-tick задержку re-assert (AC4.10).
-            IdleKeepAlive.Reconcile(ShtlMcpConfig.Enabled && ShtlMcpConfig.IdleKeepAlive);
+            IdleKeepAlive.Reconcile(WantKeepAlive(ShtlMcpConfig.Enabled, ShtlMcpConfig.IdleKeepAlive, LastRequestAgeSeconds));
         }
 
         // Завершение set_play_mode-job по достижению целевого режима (подписка переживает reload).
@@ -354,6 +354,11 @@ namespace Shtl.Mcp.Lifecycle
             CheckControlFlagBg();
             HeartbeatBg();
         }
+
+        // Адаптивная политика keepalive: full-rate update держим только при активном клиенте (недавний
+        // запрос), иначе отпускаем — не жжём батарею в глубоком простое. Чистая (тестируемая) функция.
+        internal static bool WantKeepAlive(bool enabled, bool toggle, double lastRequestAgeSeconds)
+            => enabled && toggle && lastRequestAgeSeconds >= 0 && lastRequestAgeSeconds < 120;
 
         // Снимок конфига для get_config (строится на главном потоке, читает EditorPrefs).
         JObject ConfigSnapshot() => new JObject

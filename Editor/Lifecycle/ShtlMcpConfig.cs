@@ -59,7 +59,9 @@ namespace Shtl.Mcp.Lifecycle
         /// главный поток тикал (MCP + control-flag доступны). Default OFF — компромисс idle-CPU/батарея.
         public static bool IdleKeepAlive
         {
-            get => EditorPrefs.GetBool(KeepAliveKey, false);
+            // Default ON: без него update троттлится в фоне и main-only chores (job finalize/sweep) ползут.
+            // Расход батареи ограничен адаптивностью (WantKeepAlive): full-rate только при активном клиенте.
+            get => EditorPrefs.GetBool(KeepAliveKey, true);
             set => EditorPrefs.SetBool(KeepAliveKey, value);
         }
     }
