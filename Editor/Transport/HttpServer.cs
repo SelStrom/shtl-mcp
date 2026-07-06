@@ -131,5 +131,22 @@ namespace Shtl.Mcp.Server
             }
             _listener = null;
         }
+
+        /// Немедленно освободить порт: рвёт незавершённые соединения (в отличие от graceful Stop) — снимает
+        /// TIME_WAIT, чтобы новый домен после reload биндил тот же порт сразу, не уходя в фон-зависимый retry.
+        public void Abort()
+        {
+            _running = false;
+            try
+            {
+                _listener?.Abort();
+                _listener?.Close();
+            }
+            catch
+            {
+                // ignored
+            }
+            _listener = null;
+        }
     }
 }

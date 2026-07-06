@@ -22,6 +22,7 @@ namespace Shtl.Mcp.Lifecycle
         public static ShtlMcpServer Instance => _instance ?? (_instance = new ShtlMcpServer());
 
         const string PortKey = "Shtl.Mcp.Port";
+        const string RegisteredPortKey = "Shtl.Mcp.RegisteredPort"; // порт, на который последний раз регистрировали --scope user
         const string StartedKey = "Shtl.Mcp.StartedTicks";
         const string ReloadCountKey = "Shtl.Mcp.ReloadCount";
         static readonly TimeSpan Ttl = TimeSpan.FromSeconds(30);
@@ -38,9 +39,22 @@ namespace Shtl.Mcp.Lifecycle
         readonly RegistryStore _registry = new RegistryStore(RegistryPath);
         readonly CallTail _calls = new CallTail(20); // F5/AC5.5: хвост последних вызовов для дашборда
 
-        HttpServer _http;
+        volatile HttpServer _http; // читается фоновым watchdog'ом → volatile
         bool _customToolsDiscovered; // F3/AC3.6: дискавери кастомных — один раз на инстанс (не спамить на bind-retry)
-        string _serverName;
+        volatile string _serverName; // читается фоновым watchdog'ом → volatile
+        RecoveryWatchdog _watchdog;  // фоновый поток восстановления (re-bind + control-flag + heartbeat)
+
+        // Снимок main-thread полей для bg-heartbeat: bg-поток не смеет трогать Application/EditorApplication,
+        // поэтому значения кэшируются на главном потоке (reload-stable — в EnsureStarted; mode/compiling — каждый
+        // главпоточный WatchdogTick). Держит registry.LastHeartbeat свежим при заблокированном main.
+        volatile string _hbProjectName;
+        volatile string _hbProjectPath;
+        volatile string _hbUnityVersion;
+        int _hbPid;
+        DateTime _hbStartedAt;
+        volatile RecoveryInfo _hbRecovery;
+        volatile string _hbMode = "edit";
+        volatile bool _hbCompiling;
         DateTime _lastRequestUtc = DateTime.MinValue;
         DateTime _listenerStartedUtc = DateTime.MinValue;
 
@@ -85,6 +99,27 @@ namespace Shtl.Mcp.Lifecycle
             Port = ResolvePort();
             _serverName = Shtl.Mcp.Common.ServerName.Resolve(Application.productName, ProjectPath,
                 name => _registry.LivePathForName(name, Ttl));
+
+            // Снимок reload-стабильных полей для bg-heartbeat (main-thread чтения — здесь, не в фоне).
+            _hbProjectName = Application.productName;
+            _hbProjectPath = ProjectPath;
+            _hbUnityVersion = Application.unityVersion;
+            _hbPid = System.Diagnostics.Process.GetCurrentProcess().Id;
+            _hbStartedAt = new DateTime(long.Parse(SessionState.GetString(StartedKey,
+                DateTime.UtcNow.Ticks.ToString())), DateTimeKind.Utc);
+            _hbRecovery = BuildRecovery(_hbPid);
+
+            // Глобальная (--scope user) регистрация указывает на фиксированный порт. Если PortAllocator сменил
+            // порт (preferred был занят) — пере-регистрируем на фоне, иначе клиент дозванивается на старый порт.
+            int lastRegistered = SessionState.GetInt(RegisteredPortKey, 0);
+            if (ShouldReRegister(lastRegistered, Port))
+            {
+                var regName = _serverName;
+                int regPort = Port;
+                System.Threading.Tasks.Task.Run(() =>
+                    Shtl.Mcp.Server.ClaudeCli.Run(Shtl.Mcp.Server.ClaudeCli.AddUserScopeArgs(regName, regPort), 8000));
+            }
+            SessionState.SetInt(RegisteredPortKey, Port);
 
             Application.logMessageReceivedThreaded -= OnLog;
             Application.logMessageReceivedThreaded += OnLog;
@@ -177,23 +212,30 @@ namespace Shtl.Mcp.Lifecycle
 
             _http = new HttpServer(Port, router.Handle, () => _lastRequestUtc = DateTime.UtcNow);
             _http.Start();
-            if (!_http.IsListening)
+            // bind мог не удаться (порт ещё в TIME_WAIT) — _http НЕ обнуляем: объект с готовым router'ом
+            // остаётся, фоновый watchdog повторит _http.Start() до успеха (не зависит от update-loop).
+            if (_http.IsListening)
             {
-                // bind не удался (порт ещё занят) — сбрасываем, watchdog повторит на следующем тике
-                _http = null;
-                return;
+                _listenerStartedUtc = DateTime.UtcNow; // отметка re-spawn для listenerUptimeSeconds
+                Heartbeat();
             }
-            _listenerStartedUtc = DateTime.UtcNow; // отметка re-spawn для listenerUptimeSeconds
-            Heartbeat();
-            IdleKeepAlive.Reconcile(ShtlMcpConfig.Enabled && ShtlMcpConfig.IdleKeepAlive); // AC4.10: применить сразу на старте/после reload
+            IdleKeepAlive.Reconcile(WantKeepAlive(ShtlMcpConfig.Enabled, ShtlMcpConfig.IdleKeepAlive, LastRequestAgeSeconds)); // AC4.10: применить сразу на старте/после reload
+
+            if (_watchdog == null)
+            {
+                _watchdog = new RecoveryWatchdog(WatchdogBgTick, 1000);
+                _watchdog.Start();
+            }
         }
 
         /// AC4.10: применить idle-keepalive немедленно (зовётся дашбордом после смены тогла).
-        public void SyncKeepAlive() => IdleKeepAlive.Reconcile(ShtlMcpConfig.Enabled && ShtlMcpConfig.IdleKeepAlive);
+        public void SyncKeepAlive() => IdleKeepAlive.Reconcile(WantKeepAlive(ShtlMcpConfig.Enabled, ShtlMcpConfig.IdleKeepAlive, LastRequestAgeSeconds));
 
         public void StopListenerForReload()
         {
-            _http?.Stop();
+            _watchdog?.Stop();
+            _watchdog = null;
+            _http?.Abort();
             _http = null;
         }
 
@@ -203,11 +245,32 @@ namespace Shtl.Mcp.Lifecycle
             EnsureStarted();
         }
 
+        /// Фоново-безопасный ре-бинд: только HttpListener.Start (без main-thread API). Смену ПОРТА здесь
+        /// НЕ делаем — это registry-aware ResolvePort на главном потоке (EnsureStarted). Тут лишь поднимаем
+        /// listener на уже выбранном порту. Возвращает текущее состояние прослушивания.
+        internal bool TryReBindListener()
+        {
+            var http = _http;
+            if (http == null)
+            {
+                return false; // ещё не сконструирован (до первого EnsureStarted) — поднимет main
+            }
+            if (!http.IsListening)
+            {
+                http.Start();
+                if (http.IsListening)
+                {
+                    _listenerStartedUtc = DateTime.UtcNow;
+                }
+            }
+            return http.IsListening;
+        }
+
         public void WatchdogTick()
         {
             // AC4.10: держать full-rate update в фоне (или отпустить, если выключено) — ДО enabled-гейта,
             // чтобы при выключенном сервере троттлинг вернулся к Default.
-            IdleKeepAlive.Reconcile(ShtlMcpConfig.Enabled && ShtlMcpConfig.IdleKeepAlive);
+            IdleKeepAlive.Reconcile(WantKeepAlive(ShtlMcpConfig.Enabled, ShtlMcpConfig.IdleKeepAlive, LastRequestAgeSeconds));
             if (!ShtlMcpConfig.Enabled)
             {
                 StopListenerForReload();
@@ -222,10 +285,12 @@ namespace Shtl.Mcp.Lifecycle
             CheckControlFlag(); // LLM-инициируемый форс-рестарт через ~/.unity-mcp/<serverName>.cmd (AC2.6)
             RunTestsTool.SweepOrphan(_jobs); // авто-fail зависшего/осиротевшего тест-прогона + вернуть троттлинг
             ReloadJobs.FinalizeOnTick(_jobs, ReloadCount); // завершить recompile/set_play_mode job после reload
+            _hbMode = EditorApplication.isPlaying ? "play" : "edit"; // refresh снимка для bg-heartbeat
+            _hbCompiling = EditorApplication.isCompiling;
             Heartbeat();
             // Повторно ПОСЛЕ SweepOrphan: если он снял маркер прогона и откатил no-throttle к Default, keepalive
             // переустанавливается в тот же тик (а не на следующем), закрывая 1-tick задержку re-assert (AC4.10).
-            IdleKeepAlive.Reconcile(ShtlMcpConfig.Enabled && ShtlMcpConfig.IdleKeepAlive);
+            IdleKeepAlive.Reconcile(WantKeepAlive(ShtlMcpConfig.Enabled, ShtlMcpConfig.IdleKeepAlive, LastRequestAgeSeconds));
         }
 
         // Завершение set_play_mode-job по достижению целевого режима (подписка переживает reload).
@@ -260,6 +325,58 @@ namespace Shtl.Mcp.Lifecycle
                 RestartNow();
             }
         }
+
+        // Фоновый вариант control-flag: читает+удаляет файл и, при "restart", ре-биндит listener напрямую
+        // (Abort+Start) — БЕЗ EnsureStarted, т.к. полный setup требует главного потока. Полный рестарт с
+        // ре-регистрацией тулов остаётся за EnsureStarted на главном потоке (следующий Init/afterReload).
+        internal void CheckControlFlagBg()
+        {
+            var name = _serverName;
+            if (string.IsNullOrEmpty(name))
+            {
+                return;
+            }
+            var cmdPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(RegistryPath), name + ".cmd");
+            if (!System.IO.File.Exists(cmdPath))
+            {
+                return;
+            }
+            string cmd;
+            try
+            {
+                cmd = System.IO.File.ReadAllText(cmdPath).Trim();
+                System.IO.File.Delete(cmdPath);
+            }
+            catch
+            {
+                return;
+            }
+            if (cmd == "restart")
+            {
+                var http = _http;
+                http?.Abort();
+                http?.Start(); // тот же порт; при неуспехе следующий тик TryReBindListener добьёт
+            }
+        }
+
+        // Один тик фонового восстановления (вне главного потока): поднять listener + исполнить restart-флаг.
+        // Heartbeat добавляется в Task 5. Порт/имя здесь не меняем — только liveness на уже выбранном порту.
+        void WatchdogBgTick()
+        {
+            TryReBindListener();
+            CheckControlFlagBg();
+            HeartbeatBg();
+        }
+
+        // Адаптивная политика keepalive: full-rate update держим только при активном клиенте (недавний
+        // запрос), иначе отпускаем — не жжём батарею в глубоком простое. Чистая (тестируемая) функция.
+        internal static bool WantKeepAlive(bool enabled, bool toggle, double lastRequestAgeSeconds)
+            => enabled && toggle && lastRequestAgeSeconds >= 0 && lastRequestAgeSeconds < 120;
+
+        // Ре-регистрировать --scope user надо, только если раньше уже регистрировали (lastRegistered != 0)
+        // и порт с тех пор сменился (preferred был занят → PortAllocator взял другой). Первый старт — нет.
+        internal static bool ShouldReRegister(int lastRegistered, int currentPort)
+            => lastRegistered != 0 && lastRegistered != currentPort;
 
         // Снимок конфига для get_config (строится на главном потоке, читает EditorPrefs).
         JObject ConfigSnapshot() => new JObject
@@ -345,6 +462,37 @@ namespace Shtl.Mcp.Lifecycle
                         DateTime.UtcNow.Ticks.ToString())), DateTimeKind.Utc),
                     LastHeartbeat = DateTime.UtcNow,
                     Recovery = BuildRecovery(pid) // F7/AC7.1: durable самоописываемое восстановление
+                });
+            }
+            catch { }
+        }
+
+        // Bg-heartbeat: пишет registry из volatile-снимка (без EditorApplication.*). Держит LastHeartbeat
+        // свежим, пока главный поток заблокирован → registry не «хоронит» живой инстанс → его serverName/port
+        // не перехватит тёзка того же проекта под --scope user. Registry write сериализован файл-локом.
+        void HeartbeatBg()
+        {
+            var name = _serverName;
+            var http = _http;
+            if (string.IsNullOrEmpty(name) || http == null)
+            {
+                return;
+            }
+            try
+            {
+                _registry.Upsert(new InstanceEntry
+                {
+                    ProjectName = _hbProjectName,
+                    ProjectPath = _hbProjectPath,
+                    UnityVersion = _hbUnityVersion,
+                    ServerName = name,
+                    Port = Port,
+                    Pid = _hbPid,
+                    Mode = _hbMode,
+                    Compiling = _hbCompiling,
+                    StartedAt = _hbStartedAt,
+                    LastHeartbeat = DateTime.UtcNow,
+                    Recovery = _hbRecovery
                 });
             }
             catch { }

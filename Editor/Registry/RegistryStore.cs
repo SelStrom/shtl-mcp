@@ -36,19 +36,50 @@ namespace Shtl.Mcp.Registry
             }
         }
 
-        public void Upsert(InstanceEntry e)
+        public void Upsert(InstanceEntry e) => WithLock(() =>
         {
             var list = Read();
             list.RemoveAll(x => x.ProjectPath == e.ProjectPath);
             list.Add(e);
             WriteAtomic(list);
-        }
+        });
 
-        public void Remove(string projectPath)
+        public void Remove(string projectPath) => WithLock(() =>
         {
             var list = Read();
             list.RemoveAll(x => x.ProjectPath == projectPath);
             WriteAtomic(list);
+        });
+
+        // Межпроцессная сериализация read-modify-write: эксклюзивный lock-файл рядом с реестром. Несколько
+        // Unity-инстансов пишут в ОДИН registry.json (фон-heartbeat) → без этого теряются записи (lost update).
+        // Ретраим на IOException (чужой держит lock); бросаем работу молча по исчерпанию — heartbeat повторится.
+        void WithLock(Action mutate)
+        {
+            var lockPath = _file + ".lock";
+            Directory.CreateDirectory(Path.GetDirectoryName(_file));
+            for (int attempt = 0; attempt < 50; attempt++)
+            {
+                FileStream fs;
+                try
+                {
+                    fs = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                }
+                catch (IOException)
+                {
+                    System.Threading.Thread.Sleep(5); // чужой инстанс держит lock — короткий backoff
+                    continue;
+                }
+                try
+                {
+                    mutate();
+                    return;
+                }
+                finally
+                {
+                    fs.Dispose();
+                }
+            }
         }
 
         public string LivePathForName(string serverName, TimeSpan ttl)

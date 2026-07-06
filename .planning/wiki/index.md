@@ -88,6 +88,9 @@
   (AC3.9–3.14): `write_asset` (компилируемые → reload-job), `add/remove_component`, `get/modify_object`
   (bulk+nested+asset-target), `call_method`/`find_method`, multi-scene ×4, `screenshot camera`.
   44 встроенных тула; 46 новых тестов, вкл. reload-spanning e2e write_asset.
+- [worker-process-guard](tasks/worker-process-guard/TASK.md) — bugfix: AssetImportWorker'ы исполняют
+  `InitializeOnLoad` и поднимали свои MCP-серверы, перетирая registry-запись редактора (Upsert по
+  projectPath). Guard `IsAssetImportWorkerProcess()` в bootstrap-ctor.
 
 ## Планы вех
 - [m2-plan](m2-plan.md) — декомпозиция M2 (полный тулсет + async-job + control-flag + config +
