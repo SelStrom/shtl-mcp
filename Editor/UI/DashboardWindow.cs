@@ -15,6 +15,7 @@ namespace Shtl.Mcp.UI
         Label _status, _identity, _mode, _client;
         VisualElement _mcpArea;
         Foldout _manual;
+        Foldout _bcFoldout;
         Foldout _callsFoldout;       // AC5.5: хвост последних вызовов
         VisualElement _callsList;
         VisualElement _bcArea;       // AC7.4: opt-in host-крошка
@@ -55,7 +56,7 @@ namespace Shtl.Mcp.UI
             scroll.Add(_mcpArea);
 
             // Manual fallback (свёрнут): готовая команда. Скрывается вместе с кнопкой Add, когда настроено.
-            _manual = new Foldout { text = "Manual add command", value = false };
+            _manual = new Foldout { text = "Manual add command", value = false, tooltip = ScopeTooltip };
             Indent(_manual);
             var cmd = new TextField { isReadOnly = true, multiline = true, value = AddCommand() };
             _manual.Add(cmd);
@@ -82,11 +83,12 @@ namespace Shtl.Mcp.UI
             scroll.Add(_callsFoldout);
 
             // Host recovery breadcrumb (AC7.4) — opt-in, свёрнут. Запись только по явному подтверждению.
-            var bc = new Foldout { text = "Host recovery breadcrumb", value = false, style = { marginTop = SectionGap } };
-            Indent(bc);
+            // Статус (✓ / — recommended) выносится в заголовок foldout'а, см. RenderBreadcrumb.
+            _bcFoldout = new Foldout { text = "Host recovery breadcrumb", value = false, style = { marginTop = SectionGap } };
+            Indent(_bcFoldout);
             _bcArea = new VisualElement();
-            bc.Add(_bcArea);
-            scroll.Add(bc);
+            _bcFoldout.Add(_bcArea);
+            scroll.Add(_bcFoldout);
             RenderBreadcrumb();
 
             // Настройки — в foldout, свёрнуты (дашборд компактный).
@@ -142,6 +144,12 @@ namespace Shtl.Mcp.UI
 
         // ── MCP add ──────────────────────────────────────────────────────────
 
+        const string ScopeTooltip =
+            "Регистрирует сервер глобально (--scope user) — рекомендуемый способ: Claude Code видит его из " +
+            "любого каталога, включая host-проект. Project-scope (.mcp.json в репо) не подходит: порт у каждой " +
+            "машины свой. Порт стабилен между рестартами Unity; при смене user-scope запись перерегистрируется " +
+            "автоматически.";
+
         static string AddCommand()
         {
             var s = ShtlMcpServer.Instance;
@@ -162,7 +170,7 @@ namespace Shtl.Mcp.UI
                 ShowManual(false); // настроено → manual-команда не нужна
                 return;
             }
-            var add = new Button(OnAddClicked) { text = "Add to Claude Code" };
+            var add = new Button(OnAddClicked) { text = "Add to Claude Code", tooltip = ScopeTooltip };
             _mcpArea.Add(add);
             if (configured == null)
             {
@@ -406,6 +414,16 @@ namespace Shtl.Mcp.UI
             _bcArea.Clear();
             var target = HostBreadcrumb.TargetPath(HostProjectRoot());
             bool present = System.IO.File.Exists(target) && HostBreadcrumb.IsPresent(System.IO.File.ReadAllText(target));
+
+            // Статус — в заголовке foldout'а: снаружи видно «добавлено/рекомендуется», без открытия и попапов.
+            if (_bcFoldout != null)
+            {
+                _bcFoldout.text = present ? "Host recovery breadcrumb ✓" : "Host recovery breadcrumb — recommended";
+                _bcFoldout.tooltip = present ? "" :
+                    "Рекомендуется добавить: без крошки свежая LLM-сессия при уже мёртвом сервере не знает про " +
+                    "~/.unity-mcp/registry.json (cold-start) — остальные recovery-каналы требуют хотя бы одного " +
+                    "подключения. Запись — только по явному подтверждению (opt-in, INV-2).";
+            }
 
             var why = new Label("Opt-in: append a one-line recovery pointer to the host project's CLAUDE.md so a " +
                 "fresh LLM session is primed even if this server is already dead (cold-start). Default: nothing (INV-2).");

@@ -80,8 +80,9 @@ Recovery — per-instance (а не верхнеуровневый): шаги н�
 маркером `<!-- shtl-mcp-recovery -->`), `IsPresent`/`AddTo` (идемпотентно, создаёт `CLAUDE.md` если нет).
 Дашборд: свёрнутый foldout с пояснением, целевым путём (`<UnityProjectRoot>/CLAUDE.md`), **превью точного
 текста** и кнопкой → `EditorUtility.DisplayDialog`-подтверждение → запись. Запись ТОЛЬКО по клику+подтверждению
-(human-инициированный модал — не MCP-freeze). Уже добавлено → «✓ already present». Вариант «б» (recovery-скилл)
-не делали — однострочной крошки достаточно для cold-start.
+(human-инициированный модал — не MCP-freeze). Статус виден без открытия foldout'а — в его заголовке:
+«✓» когда крошка уже в host-`CLAUDE.md`, иначе ненавязчивое «— recommended» с tooltip-объяснением (cold-start).
+Вариант «б» (recovery-скилл) не делали — однострочной крошки достаточно для cold-start.
 
 ## Связь
 - Механизм рестарта — `lifecycle-and-reload.md` §4 (control-channel).
