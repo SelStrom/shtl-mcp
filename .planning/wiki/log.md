@@ -326,3 +326,12 @@ wiki `command-set.md` (Core=44, §v2 сокращён, drift ping/get_config з�
 классы не abstract в C#-API; Rigidbody без managed DisallowMultiple (нативный enforce); editor-сборочный
 MonoBehaviour не добавляется компонентом; вторая untitled-сцена запрещена; NewScene(Additive) активирует
 новую сцену. Версия 0.5.0 (CHANGELOG: command-set v2 + ранее не релизнутые custom tools).
+
+## [2026-07-06] forward | bugfix — guard MCP-сервера от AssetImportWorker | worker-process-guard
+
+`[InitializeOnLoad]` исполняется и в AssetImportWorker'ах (тот же projectPath) → воркеры поднимали
+свои листенеры, перетирали registry-запись редактора (Upsert по projectPath, heartbeat-война) и могли
+перерегистрировать user-scope на свой порт. Фикс: ранний return в bootstrap-ctor по
+`AssetDatabase.IsAssetImportWorkerProcess()`. Raw не менялся (Instance = редактор уже зафиксирован);
+wiki multi-instance.md §Реестр — заметка о вспомогательных процессах. 204/204; registry стабилен.
+Открытый вопрос: поведение в общем batchmode/CI — в journal таска.

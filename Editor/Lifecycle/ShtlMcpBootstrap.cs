@@ -16,6 +16,14 @@ namespace Shtl.Mcp.Lifecycle
         // Канонический паттерн Unity: подписка afterAssemblyReload в [InitializeOnLoad]-ctor (INV-5).
         static ShtlMcpBootstrap()
         {
+            // AssetImportWorker-процессы грузят те же editor-сборки и тоже исполняют InitializeOnLoad.
+            // Инстанс — главный редактор: воркеру нельзя поднимать listener, перетирать registry-запись
+            // редактора (Upsert по projectPath) и перерегистрировать user-scope на свой порт.
+            if (AssetDatabase.IsAssetImportWorkerProcess())
+            {
+                return;
+            }
+
             AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeReload;
             AssemblyReloadEvents.beforeAssemblyReload += OnBeforeReload;
 

@@ -61,6 +61,12 @@ heartbeat:
   нескольких инстансах.
 - Тот же каталог `~/.unity-mcp/` хранит управляющие флаги `<serverName>.cmd`
   (см. `lifecycle-and-reload.md` §4 Control-channel).
+- **Инстанс = главный процесс редактора.** Вспомогательные процессы Unity
+  (AssetImportWorker) грузят те же editor-сборки и исполняют `InitializeOnLoad`
+  с тем же `projectPath` — без guard'а воркер поднимал бы свой listener,
+  перетирал registry-запись редактора и перерегистрировал user-scope на свой
+  порт. Bootstrap отсекает их через `AssetDatabase.IsAssetImportWorkerProcess()`
+  (таск `worker-process-guard`).
 
 ## Как модель адресует инстанс
 1. `cat ~/.unity-mcp/registry.json` (Bash) → видит все живые инстансы и порты.
