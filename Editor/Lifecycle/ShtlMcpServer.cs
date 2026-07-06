@@ -22,6 +22,7 @@ namespace Shtl.Mcp.Lifecycle
         public static ShtlMcpServer Instance => _instance ?? (_instance = new ShtlMcpServer());
 
         const string PortKey = "Shtl.Mcp.Port";
+        const string RegisteredPortKey = "Shtl.Mcp.RegisteredPort"; // порт, на который последний раз регистрировали --scope user
         const string StartedKey = "Shtl.Mcp.StartedTicks";
         const string ReloadCountKey = "Shtl.Mcp.ReloadCount";
         static readonly TimeSpan Ttl = TimeSpan.FromSeconds(30);
@@ -107,6 +108,18 @@ namespace Shtl.Mcp.Lifecycle
             _hbStartedAt = new DateTime(long.Parse(SessionState.GetString(StartedKey,
                 DateTime.UtcNow.Ticks.ToString())), DateTimeKind.Utc);
             _hbRecovery = BuildRecovery(_hbPid);
+
+            // Глобальная (--scope user) регистрация указывает на фиксированный порт. Если PortAllocator сменил
+            // порт (preferred был занят) — пере-регистрируем на фоне, иначе клиент дозванивается на старый порт.
+            int lastRegistered = SessionState.GetInt(RegisteredPortKey, 0);
+            if (ShouldReRegister(lastRegistered, Port))
+            {
+                var regName = _serverName;
+                int regPort = Port;
+                System.Threading.Tasks.Task.Run(() =>
+                    Shtl.Mcp.Server.ClaudeCli.Run(Shtl.Mcp.Server.ClaudeCli.AddUserScopeArgs(regName, regPort), 8000));
+            }
+            SessionState.SetInt(RegisteredPortKey, Port);
 
             Application.logMessageReceivedThreaded -= OnLog;
             Application.logMessageReceivedThreaded += OnLog;
@@ -359,6 +372,11 @@ namespace Shtl.Mcp.Lifecycle
         // запрос), иначе отпускаем — не жжём батарею в глубоком простое. Чистая (тестируемая) функция.
         internal static bool WantKeepAlive(bool enabled, bool toggle, double lastRequestAgeSeconds)
             => enabled && toggle && lastRequestAgeSeconds >= 0 && lastRequestAgeSeconds < 120;
+
+        // Ре-регистрировать --scope user надо, только если раньше уже регистрировали (lastRegistered != 0)
+        // и порт с тех пор сменился (preferred был занят → PortAllocator взял другой). Первый старт — нет.
+        internal static bool ShouldReRegister(int lastRegistered, int currentPort)
+            => lastRegistered != 0 && lastRegistered != currentPort;
 
         // Снимок конфига для get_config (строится на главном потоке, читает EditorPrefs).
         JObject ConfigSnapshot() => new JObject
