@@ -4,15 +4,34 @@ All notable changes to this package are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning is
 [SemVer](https://semver.org/).
 
-## [Unreleased]
+## [0.6.0] — 2026-07-06
 
 ### Added
+- **Background recovery watchdog:** listener re-bind, control-flag execution and registry heartbeat run
+  on a dedicated background thread, independent of `EditorApplication.update` (which throttles without
+  focus and freezes on modal dialogs). Restores INV-5 self-recovery for an unfocused editor; the
+  listener is also aborted on domain reload for immediate port re-bind.
+- **Background heartbeat:** a wedged-but-live instance (blocked main thread) keeps its registry entry
+  fresh, so it is no longer falsely pruned by TTL.
+- **Adaptive `IdleKeepAlive`:** defaults on while an MCP client is actively talking to the instance,
+  releases the editor back to normal throttling when idle.
+- **User-scope re-registration on port drift:** when the port allocator lands on a different port than
+  the one last registered, the `claude mcp add --scope user` entry is re-pointed automatically.
+- **Cross-process registry lock:** read-modify-write of `registry.json` is serialized via a lock file,
+  so concurrent heartbeats from several Unity instances no longer lose entries.
 - **`screenshot_uxml`:** render a single UXML asset to a PNG entirely in **Edit mode** (no Play mode).
   Builds a temporary offscreen UI Toolkit panel (`PanelSettings.targetTexture`), clones the UXML in,
   forces the panel's layout + repaint via internal API, and reads back the `RenderTexture`. Styles come
   from the UXML's own `<Style>` imports plus any `uss` paths passed in; `theme` auto-picks the first
   project `ThemeStyleSheet` when omitted. Complements `screenshot overlay:true` (that captures the full
   Play-mode backbuffer composite; this isolates and verifies one UXML's layout without entering Play).
+
+### Fixed
+- **AssetImportWorker processes no longer start their own MCP server.** Unity's import workers load the
+  same editor assemblies (and run `InitializeOnLoad`) with the same `projectPath`: each worker spun up
+  its own listener, its heartbeat kept overwriting the editor's registry entry, and it could re-point
+  the user-scope registration to the worker's port. The bootstrap now bails out via
+  `AssetDatabase.IsAssetImportWorkerProcess()`.
 
 ## [0.5.1] — 2026-07-04
 
