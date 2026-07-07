@@ -34,6 +34,15 @@ namespace Shtl.Mcp.Logging
             }
         }
 
+        /// Снимок всех записей в хронологическом порядке (для персиста через domain reload).
+        public IReadOnlyList<LogItem> Snapshot()
+        {
+            lock (_lock)
+            {
+                return _items.ToList();
+            }
+        }
+
         /// Возвращает до count последних записей (в хронологическом порядке), c фильтром по min-уровню.
         public IReadOnlyList<LogItem> Get(LogLevel? min, int count)
         {

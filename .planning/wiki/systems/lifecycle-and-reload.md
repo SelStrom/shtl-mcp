@@ -24,8 +24,8 @@ Domain; CoplayDev имеет баг утечки TcpListener после reload).
 - `AssemblyReloadEvents.beforeAssemblyReload` → чистое закрытие `HttpListener`
   и сокетов (иначе утечка/занятый порт, см. баг конкурента).
 - `AssemblyReloadEvents.afterAssemblyReload` → переподнятие.
-- Состояние (выбранный порт, флаг «сервер должен работать», активные jobs) — в
-  `SessionState` (переживает domain reload в пределах сессии Editor).
+- Состояние (выбранный порт, флаг «сервер должен работать», активные jobs,
+  буфер логов) — в `SessionState` (переживает domain reload в пределах сессии Editor).
 - Окно недоступности ~секунды — клиент ретраит; это допустимо.
 - **Наблюдаемость re-spawn (AC4.7).** `beforeAssemblyReload` инкрементит durable
   `reloadCount` (`SessionState`); каждый успешный re-spawn (`EnsureStarted`) ставит
@@ -33,6 +33,24 @@ Domain; CoplayDev имеет баг утечки TcpListener после reload).
   Оба — в `status`. Durable `uptimeSeconds` (от `StartedTicks`, ставится раз за
   сессию) один re-spawn не отличает; новые счётчики делают reload/rebind видимыми
   по live-каналу и фальсифицируемыми вручную.
+
+### Захват лога: ранняя подписка + выживание reload (AC4.11)
+Буфер `get_logs` — тоже reload-выживаемое состояние, но с двумя ловушками сверх jobs:
+- **Ранняя подписка.** `Application.logMessageReceivedThreaded` навешивается в
+  `[InitializeOnLoad]`-ctor'е (`LogCapture.Install`, зовётся из `ShtlMcpBootstrap` до
+  подъёма listener'а), а НЕ в `EnsureStarted`. Иначе окно «загрузка домена → первый
+  тик update, поднимающий сервер» теряет стартовые логи редактора и логи сразу после
+  reload. Симптом старого поведения: Console редактора полон, а `get_logs` пуст (подписка
+  навесилась позже появления записей и/или обнулилась на reload).
+- **Персист через reload.** `LogBuffer` — статик `LogCapture.Buffer`; статики гибнут на
+  reload. `beforeAssemblyReload` сериализует буфер в `SessionState`
+  (`Shtl.Mcp.LogBuffer`), `Install` восстанавливает — как JobStore.
+- **Только главный редактор.** `Install` под guard'ом `IsAssetImportWorkerProcess` (в
+  bootstrap): у воркеров свой SessionState и свой лог, не Console редактора.
+- **Best-effort полнота.** Логи до самого `[InitializeOnLoad]` (ранняя инициализация
+  движка) или в окне reload до переподписки в буфер не попадают — без нативных хуков
+  неустранимо. Тулы `get_logs`/`clear_logs` получают `LogCapture.Buffer` от сервера;
+  сам сервер логами больше не владеет. Реализация — `Editor/Lifecycle/LogCapture.cs`.
 
 ## 2. Async-job модель (для долгих/reload-команд)
 Команды, которые сами триггерят reload или идут долго, **нельзя** ждать на одном
@@ -143,3 +161,7 @@ main-thread-инструменты (`status`) виснут на таймауте
   порту. RED-gate подтверждён (без механизма 1 / без watchdog-ветки оба теста краснеют).
 - **M2** (jobs): соединение/job переживают play→edit-переход; JobStore сериализуется/восстанавливается
   через эмулированный reload (`SessionState` round-trip).
+- **Захват лога (AC4.11):** `LogCaptureTests` (EditMode) — round-trip `Serialize`→`Deserialize`
+  сохраняет message/stack/level и порядок; повреждённый/пустой снимок → пустой буфер без исключения;
+  восстановление в новый `LogBuffer` совпадает с исходным `Get`. Live-проверка: после рекомпиляции
+  `get_logs` всё ещё содержит до-reload записи, а стартовые логи редактора видны с первого запроса.

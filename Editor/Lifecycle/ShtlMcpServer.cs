@@ -8,7 +8,6 @@ using UnityEngine;
 using Shtl.Mcp.Common;
 using Shtl.Mcp.Dispatch;
 using Shtl.Mcp.Jobs;
-using Shtl.Mcp.Logging;
 using Shtl.Mcp.Registry;
 using Shtl.Mcp.Server;
 using Shtl.Mcp.Tools;
@@ -33,7 +32,6 @@ namespace Shtl.Mcp.Lifecycle
             .FindForAssembly(typeof(ShtlMcpServer).Assembly)?.version ?? "unknown";
 
         readonly MainThreadDispatcher _dispatcher = new MainThreadDispatcher();
-        readonly LogBuffer _logs = new LogBuffer(500);
         readonly JobStore _jobs = new JobStore();
         readonly ToolRegistry _tools = new ToolRegistry();
         readonly RegistryStore _registry = new RegistryStore(RegistryPath);
@@ -121,22 +119,19 @@ namespace Shtl.Mcp.Lifecycle
             }
             SessionState.SetInt(RegisteredPortKey, Port);
 
-            Application.logMessageReceivedThreaded -= OnLog;
-            Application.logMessageReceivedThreaded += OnLog;
-
             EditorApplication.update -= _dispatcher.Drain;
             EditorApplication.update += _dispatcher.Drain;
 
             var ctx = new EditorContext(() => Port, () => _serverName, () => Uptime, ClientCount,
                 () => ListenerUptime, () => ReloadCount);
             _tools.Register(new StatusTool(ctx));
-            _tools.Register(new GetLogsTool(_logs));
+            _tools.Register(new GetLogsTool(LogCapture.Buffer));
             _tools.Register(new PingTool(() => _dispatcher.LastDrainUtc, () => ListenerUptime)); // bg-liveness (AC4.8)
             _tools.Register(new RecompileTool(_jobs, () => ReloadCount));
             _tools.Register(new SetPlayModeTool(_jobs, () => ReloadCount));
             _tools.Register(new GetJobTool(_jobs));
             _tools.Register(new RunTestsTool(_jobs));
-            _tools.Register(new ClearLogsTool(_logs));
+            _tools.Register(new ClearLogsTool(LogCapture.Buffer));
             _tools.Register(new RefreshAssetsTool(_jobs, () => ReloadCount));
             _tools.Register(new FindAssetsTool());
             _tools.Register(new ReadAssetTool());
@@ -437,11 +432,6 @@ namespace Shtl.Mcp.Lifecycle
                 RestartCommand = "printf 'restart' > '" + cmdPath + "'"
             };
         }
-
-        void OnLog(string message, string stack, LogType type)
-            => _logs.Add(message, stack,
-                type == LogType.Error || type == LogType.Exception || type == LogType.Assert ? LogLevel.Error :
-                type == LogType.Warning ? LogLevel.Warning : LogLevel.Info);
 
         void Heartbeat()
         {
