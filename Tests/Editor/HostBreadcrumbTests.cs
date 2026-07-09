@@ -24,11 +24,93 @@ namespace Shtl.Mcp.Editor.Tests
             Assert.IsFalse(HostBreadcrumb.IsPresent(null));
         }
 
-        [Test] public void TargetPath_IsClaudeMdAtRoot()
+        [Test] public void Resolve_NestedUnityProject_PicksRepoRootClaudeMd()
         {
-            var p = HostBreadcrumb.TargetPath(Path.Combine("foo", "bar"));
-            StringAssert.EndsWith("CLAUDE.md", p);
-            StringAssert.Contains("bar", p);
+            var repo = TempTree(out var unityRoot, gitAsFile: false);
+            try
+            {
+                File.WriteAllText(Path.Combine(repo, "CLAUDE.md"), "# Repo\n");
+                var p = HostBreadcrumb.ResolveTargetPath(unityRoot);
+                Assert.AreEqual(Path.Combine(repo, "CLAUDE.md"), p);
+            }
+            finally { Directory.Delete(repo, true); }
+        }
+
+        [Test] public void Resolve_NoClaudeMdAnywhere_DefaultsToRepoRoot()
+        {
+            var repo = TempTree(out var unityRoot, gitAsFile: false);
+            try
+            {
+                var p = HostBreadcrumb.ResolveTargetPath(unityRoot);
+                Assert.AreEqual(Path.Combine(repo, "CLAUDE.md"), p, "файла нет нигде — создавать в git-корне");
+            }
+            finally { Directory.Delete(repo, true); }
+        }
+
+        [Test] public void Resolve_MarkerAtUnityRoot_WinsOverRepoRoot()
+        {
+            var repo = TempTree(out var unityRoot, gitAsFile: false);
+            try
+            {
+                File.WriteAllText(Path.Combine(repo, "CLAUDE.md"), "# Repo без маркера\n");
+                File.WriteAllText(Path.Combine(unityRoot, "CLAUDE.md"), "x " + HostBreadcrumb.Marker + "\n");
+                var p = HostBreadcrumb.ResolveTargetPath(unityRoot);
+                Assert.AreEqual(Path.Combine(unityRoot, "CLAUDE.md"), p, "крошка уже добавлена ранее — статус ✓, не дублировать в другом файле");
+            }
+            finally { Directory.Delete(repo, true); }
+        }
+
+        [Test] public void Resolve_ExistingOnlyAtUnityRoot_UsedWhenRepoRootHasNone()
+        {
+            var repo = TempTree(out var unityRoot, gitAsFile: false);
+            try
+            {
+                File.WriteAllText(Path.Combine(unityRoot, "CLAUDE.md"), "# Unity host\n");
+                var p = HostBreadcrumb.ResolveTargetPath(unityRoot);
+                Assert.AreEqual(Path.Combine(unityRoot, "CLAUDE.md"), p, "дописывать в существующий файл, а не создавать новый");
+            }
+            finally { Directory.Delete(repo, true); }
+        }
+
+        [Test] public void Resolve_GitFile_TreatedAsRepoRoot()
+        {
+            var repo = TempTree(out var unityRoot, gitAsFile: true); // worktree/submodule: .git — файл
+            try
+            {
+                var p = HostBreadcrumb.ResolveTargetPath(unityRoot);
+                Assert.AreEqual(Path.Combine(repo, "CLAUDE.md"), p);
+            }
+            finally { Directory.Delete(repo, true); }
+        }
+
+        [Test] public void Resolve_NoGit_FallsBackToUnityProjectRoot()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "shtl_bc_" + Guid.NewGuid().ToString("N"));
+            var unityRoot = Path.Combine(root, "Client", "Unity");
+            Directory.CreateDirectory(unityRoot);
+            try
+            {
+                var p = HostBreadcrumb.ResolveTargetPath(unityRoot);
+                Assert.AreEqual(Path.Combine(unityRoot, "CLAUDE.md"), p);
+            }
+            finally { Directory.Delete(root, true); }
+        }
+
+        /// repo/.git + repo/Client/Unity — типовая вложенность Unity-проекта в репозиторий.
+        static string TempTree(out string unityProjectRoot, bool gitAsFile)
+        {
+            var repo = Path.Combine(Path.GetTempPath(), "shtl_bc_" + Guid.NewGuid().ToString("N"));
+            unityProjectRoot = Path.Combine(repo, "Client", "Unity");
+            Directory.CreateDirectory(unityProjectRoot);
+            if (gitAsFile)
+            {
+                File.WriteAllText(Path.Combine(repo, ".git"), "gitdir: /elsewhere\n");
+            }
+            else
+            {
+                Directory.CreateDirectory(Path.Combine(repo, ".git"));
+            }
+            return repo;
         }
 
         [Test] public void AddTo_AppendsThenIdempotent()

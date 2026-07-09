@@ -346,3 +346,11 @@ reload) + `LogBuffer` как поле статик-синглтона серве
 владеет (тулы ← `LogCapture.Buffer`). Prior art: CoplayDev читает `LogEntries` рефлексией (видит историю
 Console, но хрупко — issue #761); мы остаёмся на официальном колбэке. raw F4/AC4.11 + wiki
 lifecycle-and-reload. Тест `LogCaptureTests` (round-trip); EditMode-прогон в `TestProject~` — на приёмке.
+
+## [2026-07-10] forward | bugfix — host-крошка в CLAUDE.md корня репозитория | breadcrumb-target-repo-root
+
+Дашборд предлагал крошку в `<UnityProjectRoot>/CLAUDE.md`, но Unity-проект часто вложен в репо
+(PerfectWar: `repo/Client/PerfectWar/`), а Claude Code грузит CLAUDE.md от корня репозитория —
+крошка была невидима свежей сессии. `ResolveTargetPath`: обход вверх до `.git` (dir/file),
+приоритет маркер → существующий CLAUDE.md ближе к git-корню → git-корень; вне git — прежнее
+поведение. Raw не менялся (AC7.4 фиксирует «CLAUDE.md host-проекта», не путь).

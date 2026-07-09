@@ -17,6 +17,13 @@ All notable changes to this package are documented here. Format follows
   jobs survive reload. Capture stays off in `AssetImportWorker` processes. Best-effort: logs emitted before
   `[InitializeOnLoad]` itself (early engine init) or during the reload window before re-subscription are
   still not captured (unavoidable without native hooks).
+- **Host recovery breadcrumb targets the repository-root `CLAUDE.md`.** Unity projects are often
+  nested inside a repo (`repo/Client/<Project>/`), while Claude Code loads `CLAUDE.md` from the
+  repository root — a breadcrumb written to the Unity project root was invisible to a fresh
+  session. `HostBreadcrumb.ResolveTargetPath` now walks up from the Unity project root to the git
+  root (`.git` dir or file), preferring: a file already containing the marker → an existing
+  `CLAUDE.md` closest to the git root → the git root (file created). Outside a git repo the old
+  behavior (Unity project root) is kept.
 
 ## [0.6.0] — 2026-07-06
 

@@ -412,7 +412,7 @@ namespace Shtl.Mcp.UI
                 return;
             }
             _bcArea.Clear();
-            var target = HostBreadcrumb.TargetPath(HostProjectRoot());
+            var target = HostBreadcrumb.ResolveTargetPath(HostProjectRoot());
             bool present = System.IO.File.Exists(target) && HostBreadcrumb.IsPresent(System.IO.File.ReadAllText(target));
 
             // Статус — в заголовке foldout'а: снаружи видно «добавлено/рекомендуется», без открытия и попапов.
@@ -445,7 +445,7 @@ namespace Shtl.Mcp.UI
 
         void OnAddBreadcrumb()
         {
-            var target = HostBreadcrumb.TargetPath(HostProjectRoot());
+            var target = HostBreadcrumb.ResolveTargetPath(HostProjectRoot());
             // Человеко-инициированный модал (клик по кнопке) — это НЕ MCP-freeze (тот про автономные модалы).
             bool ok = EditorUtility.DisplayDialog("Add recovery breadcrumb?",
                 "Append the shtl-mcp recovery pointer to:\n" + target +
