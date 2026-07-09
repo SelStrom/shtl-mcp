@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 
 namespace Shtl.Mcp.Lifecycle
@@ -26,9 +27,51 @@ namespace Shtl.Mcp.Lifecycle
             return !string.IsNullOrEmpty(content) && content.Contains(Marker);
         }
 
-        public static string TargetPath(string projectRoot)
+        /// Unity-проект часто вложен в репозиторий (`repo/Client/<Project>/`), а Claude Code при
+        /// старте грузит CLAUDE.md от корня репозитория — крошка в корне Unity-проекта там не видна.
+        /// Кандидаты — каждый уровень от git-корня (директория с `.git`) вниз до корня Unity-проекта;
+        /// приоритет: файл с уже добавленным маркером → существующий CLAUDE.md, ближайший к git-корню
+        /// → git-корень (файл будет создан). Unity-проект вне git — корень Unity-проекта.
+        public static string ResolveTargetPath(string unityProjectRoot)
         {
-            return Path.Combine(projectRoot, "CLAUDE.md");
+            var candidates = new List<string>();
+            foreach (string dir in CandidateDirs(unityProjectRoot))
+            {
+                candidates.Add(Path.Combine(dir, "CLAUDE.md"));
+            }
+            foreach (string path in candidates)
+            {
+                if (File.Exists(path) && IsPresent(File.ReadAllText(path)))
+                {
+                    return path;
+                }
+            }
+            foreach (string path in candidates)
+            {
+                if (File.Exists(path))
+                {
+                    return path;
+                }
+            }
+            return candidates[0];
+        }
+
+        static List<string> CandidateDirs(string unityProjectRoot)
+        {
+            var chain = new List<string>();
+            var dir = new DirectoryInfo(unityProjectRoot);
+            while (dir != null)
+            {
+                chain.Add(dir.FullName);
+                string git = Path.Combine(dir.FullName, ".git");
+                if (Directory.Exists(git) || File.Exists(git)) // .git-файл: worktree/submodule
+                {
+                    chain.Reverse(); // git-корень первым — у него приоритет
+                    return chain;
+                }
+                dir = dir.Parent;
+            }
+            return new List<string> { new DirectoryInfo(unityProjectRoot).FullName };
         }
 
         /// Идемпотентно дописать крошку. true = записали; false = маркер уже был (no-op). Создаёт файл, если нет.

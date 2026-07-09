@@ -335,3 +335,11 @@ MonoBehaviour не добавляется компонентом; вторая u
 `AssetDatabase.IsAssetImportWorkerProcess()`. Raw не менялся (Instance = редактор уже зафиксирован);
 wiki multi-instance.md §Реестр — заметка о вспомогательных процессах. 204/204; registry стабилен.
 Открытый вопрос: поведение в общем batchmode/CI — в journal таска.
+
+## [2026-07-10] forward | bugfix — host-крошка в CLAUDE.md корня репозитория | breadcrumb-target-repo-root
+
+Дашборд предлагал крошку в `<UnityProjectRoot>/CLAUDE.md`, но Unity-проект часто вложен в репо
+(PerfectWar: `repo/Client/PerfectWar/`), а Claude Code грузит CLAUDE.md от корня репозитория —
+крошка была невидима свежей сессии. `ResolveTargetPath`: обход вверх до `.git` (dir/file),
+приоритет маркер → существующий CLAUDE.md ближе к git-корню → git-корень; вне git — прежнее
+поведение. Raw не менялся (AC7.4 фиксирует «CLAUDE.md host-проекта», не путь).
