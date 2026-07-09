@@ -24,6 +24,11 @@ namespace Shtl.Mcp.Lifecycle
                 return;
             }
 
+            // Захват лога — ДО подъёма сервера: подписка навешивается синхронно на этой загрузке домена,
+            // поэтому стартовые логи и логи сразу после reload не теряются (сервер стартует позже, через
+            // delayCall/afterAssemblyReload). Буфер переживает reload через SessionState.
+            LogCapture.Install();
+
             AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeReload;
             AssemblyReloadEvents.beforeAssemblyReload += OnBeforeReload;
 

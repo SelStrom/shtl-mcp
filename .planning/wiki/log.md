@@ -336,6 +336,17 @@ MonoBehaviour не добавляется компонентом; вторая u
 wiki multi-instance.md §Реестр — заметка о вспомогательных процессах. 204/204; registry стабилен.
 Открытый вопрос: поведение в общем batchmode/CI — в journal таска.
 
+## [2026-07-07] forward | F4/AC4.11 ранний захват лога + персист через reload | log-capture-early-persist
+
+Живой инстанс: `get_logs` пуст при непустой Console. Две причины — подписка
+`logMessageReceivedThreaded` жила в `EnsureStarted` (поздняя, delayCall → теряет старт и окно после
+reload) + `LogBuffer` как поле статик-синглтона сервера (гибнет на domain reload). Фикс: новый
+`LogCapture` — ранняя подписка из `[InitializeOnLoad]`-ctor'а bootstrap (`Install`, под worker-guard'ом) +
+персист буфера в `SessionState` (`beforeAssemblyReload`→`Restore`), как JobStore. Сервер логами больше не
+владеет (тулы ← `LogCapture.Buffer`). Prior art: CoplayDev читает `LogEntries` рефлексией (видит историю
+Console, но хрупко — issue #761); мы остаёмся на официальном колбэке. raw F4/AC4.11 + wiki
+lifecycle-and-reload. Тест `LogCaptureTests` (round-trip); EditMode-прогон в `TestProject~` — на приёмке.
+
 ## [2026-07-10] forward | bugfix — host-крошка в CLAUDE.md корня репозитория | breadcrumb-target-repo-root
 
 Дашборд предлагал крошку в `<UnityProjectRoot>/CLAUDE.md`, но Unity-проект часто вложен в репо

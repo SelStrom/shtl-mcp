@@ -91,6 +91,9 @@
 - [worker-process-guard](tasks/worker-process-guard/TASK.md) — bugfix: AssetImportWorker'ы исполняют
   `InitializeOnLoad` и поднимали свои MCP-серверы, перетирая registry-запись редактора (Upsert по
   projectPath). Guard `IsAssetImportWorkerProcess()` в bootstrap-ctor.
+- [log-capture-early-persist](tasks/log-capture-early-persist/TASK.md) — F4/AC4.11: `get_logs` был пуст при
+  непустой Console — подписка в `EnsureStarted` (поздняя) + буфер как поле статик-синглтона (гибнет на
+  reload). Фикс: `LogCapture` — ранняя подписка из `[InitializeOnLoad]` + персист буфера через `SessionState`.
 
 ## Планы вех
 - [m2-plan](m2-plan.md) — декомпозиция M2 (полный тулсет + async-job + control-flag + config +

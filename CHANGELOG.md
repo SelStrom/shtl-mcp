@@ -7,6 +7,16 @@ All notable changes to this package are documented here. Format follows
 ## [Unreleased]
 
 ### Fixed
+- **`get_logs` no longer misses startup and pre-reload logs.** Log capture used to subscribe to
+  `Application.logMessageReceivedThreaded` inside `EnsureStarted` (which runs late, on the first
+  `EditorApplication.update` tick after a domain load) and kept the buffer as an instance field of the
+  static-singleton server (wiped on every domain reload). Result: the editor Console showed entries while
+  `get_logs` returned empty. Capture now lives in `LogCapture`: the subscription is armed **early** from the
+  `[InitializeOnLoad]` bootstrap ctor (synchronously on every domain load, before the listener starts), and
+  the buffer is serialized to `SessionState` on `beforeAssemblyReload` and restored on load — the same way
+  jobs survive reload. Capture stays off in `AssetImportWorker` processes. Best-effort: logs emitted before
+  `[InitializeOnLoad]` itself (early engine init) or during the reload window before re-subscription are
+  still not captured (unavoidable without native hooks).
 - **Host recovery breadcrumb targets the repository-root `CLAUDE.md`.** Unity projects are often
   nested inside a repo (`repo/Client/<Project>/`), while Claude Code loads `CLAUDE.md` from the
   repository root — a breadcrumb written to the Unity project root was invisible to a fresh
