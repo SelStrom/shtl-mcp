@@ -33,11 +33,16 @@ namespace Shtl.Mcp.Tools
             }
         }
 
-        // true — записано; false — тип не поддержан для записи.
-        public static bool Write(SerializedProperty p, JToken v)
+        // true — записано; false — не записано, причина в error.
+        public static bool Write(SerializedProperty p, JToken v, out string error)
         {
+            error = null;
             switch (p.propertyType)
             {
+                case SerializedPropertyType.ObjectReference:
+                {
+                    return WriteObjectRef(p, v, out error);
+                }
                 case SerializedPropertyType.Integer:
                 {
                     p.intValue = (int)v;
@@ -80,9 +85,72 @@ namespace Shtl.Mcp.Tools
                 }
                 default:
                 {
+                    error = "unsupported property type for write: " + p.propertyType;
                     return false;
                 }
             }
+        }
+
+        /// Ссылочное поле: значение — та же ссылка, что и target у get_object/modify_object
+        /// (scene-GO по пути/имени, asset-path, instanceId), null снимает ссылку. Если поле ждёт
+        /// компонент, а указан GameObject — берём с него компонент нужного типа.
+        static bool WriteObjectRef(SerializedProperty p, JToken v, out string error)
+        {
+            error = null;
+            if (v == null || v.Type == JTokenType.Null)
+            {
+                p.objectReferenceValue = null;
+                return true;
+            }
+
+            var obj = ObjectRefs.Resolve(v, out var resolveErr);
+            if (obj == null)
+            {
+                error = resolveErr;
+                return false;
+            }
+
+            var expected = ExpectedType(p);
+            if (expected == null)
+            {
+                // Тип поля не разрешился (встроенный ресурс, тип из выгруженной сборки) — пишем как есть:
+                // несовместимую ссылку Unity отбросит, и это видно в results ответа.
+                p.objectReferenceValue = obj;
+                return true;
+            }
+
+            if (!expected.IsInstanceOfType(obj) && obj is GameObject go)
+            {
+                var component = go.GetComponent(expected);
+                if (component != null)
+                {
+                    obj = component;
+                }
+            }
+
+            if (!expected.IsInstanceOfType(obj))
+            {
+                error = "value type mismatch: property expects " + expected.Name + ", got " + obj.GetType().Name;
+                return false;
+            }
+
+            p.objectReferenceValue = obj;
+            return true;
+        }
+
+        /// Тип ссылочного поля из SerializedProperty.type — строки вида "PPtr&lt;$Material&gt;".
+        /// Возвращает null, если имя не распознано или тип не найден.
+        static Type ExpectedType(SerializedProperty p)
+        {
+            var raw = p.type;
+            const string prefix = "PPtr<$";
+            if (string.IsNullOrEmpty(raw) || !raw.StartsWith(prefix, StringComparison.Ordinal) || !raw.EndsWith(">", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var name = raw.Substring(prefix.Length, raw.Length - prefix.Length - 1);
+            return TypeResolve.Find(name, null, typeof(UnityEngine.Object), out _);
         }
     }
 
@@ -369,9 +437,9 @@ namespace Shtl.Mcp.Tools
             {
                 try
                 {
-                    if (!SerializedValues.Write(w.prop, w.value))
+                    if (!SerializedValues.Write(w.prop, w.value, out var writeErr))
                     {
-                        return new JObject { ["error"] = "unsupported property type for write: " + w.prop.propertyType + " (" + w.path + ")" };
+                        return new JObject { ["error"] = writeErr + " (" + w.path + ")" };
                     }
                 }
                 catch (Exception e)

@@ -12,6 +12,8 @@ namespace Shtl.Mcp.Editor.Tests
     {
         const string Obj = "ShtlT6bObj";
         const string SoPath = "Assets/ShtlM5TestConfig.asset";
+        const string Obj2 = "ShtlT6bObj2";
+        const string MatPath = "Assets/ShtlObjRefTest.mat";
         Object[] _savedSelection;
 
         [SetUp]
@@ -24,13 +26,20 @@ namespace Shtl.Mcp.Editor.Tests
         public void TearDown()
         {
             Selection.objects = _savedSelection;
-            var go = GameObject.Find(Obj);
+            DestroyAllNamed(Obj);
+            DestroyAllNamed(Obj2);
+            AssetDatabase.DeleteAsset(SoPath);
+            AssetDatabase.DeleteAsset(MatPath);
+        }
+
+        static void DestroyAllNamed(string name)
+        {
+            var go = GameObject.Find(name);
             while (go != null)
             {
                 Object.DestroyImmediate(go);
-                go = GameObject.Find(Obj);
+                go = GameObject.Find(name);
             }
-            AssetDatabase.DeleteAsset(SoPath);
         }
 
         [Test]
@@ -176,6 +185,93 @@ namespace Shtl.Mcp.Editor.Tests
             Assert.IsNull(res["error"], res.ToString());
             StringAssert.Contains("BoxCollider", res["components"].ToString());
             StringAssert.Contains("m_Size", res["components"].ToString(), "сериализованные свойства достаточно глубоко (AC3.11в)");
+        }
+
+        [Test]
+        public void ModifyObject_ObjectReference_ByAssetPath_ThenCleared()
+        {
+            var so = ScriptableObject.CreateInstance<ShtlM5TestConfig>();
+            AssetDatabase.CreateAsset(so, SoPath);
+            AssetDatabase.CreateAsset(new Material(Shader.Find("Unlit/Color")), MatPath);
+
+            var set = new ModifyObjectTool().Invoke(new JObject
+            {
+                ["target"] = SoPath,
+                ["property"] = "material",
+                ["value"] = MatPath
+            });
+            Assert.IsTrue((bool)set["modified"], set.ToString());
+            Assert.AreEqual(AssetDatabase.LoadAssetAtPath<Material>(MatPath),
+                AssetDatabase.LoadAssetAtPath<ShtlM5TestConfig>(SoPath).material,
+                "ссылка на ассет записана по asset-path");
+
+            var cleared = new ModifyObjectTool().Invoke(new JObject
+            {
+                ["target"] = SoPath,
+                ["property"] = "material",
+                ["value"] = JValue.CreateNull()
+            });
+            Assert.IsTrue((bool)cleared["modified"], cleared.ToString());
+            Assert.IsNull(AssetDatabase.LoadAssetAtPath<ShtlM5TestConfig>(SoPath).material,
+                "null снимает ссылку");
+        }
+
+        [Test]
+        public void ModifyObject_ObjectReference_SceneRef_GameObjectResolvesToComponent()
+        {
+            new GameObjectCreateTool().Invoke(new JObject { ["name"] = Obj, ["primitive"] = "cube" });
+            new GameObjectCreateTool().Invoke(new JObject { ["name"] = Obj2, ["primitive"] = "cube" });
+            GameObject.Find(Obj).AddComponent<HingeJoint>();
+            // Своё же тело Unity в connectedBody не пускает — цель на отдельном объекте.
+            var body = GameObject.Find(Obj2).AddComponent<Rigidbody>();
+
+            // m_ConnectedBody ждёт Rigidbody, указан GameObject — компонент берётся с него.
+            var res = new ModifyObjectTool().Invoke(new JObject
+            {
+                ["target"] = Obj,
+                ["component"] = "HingeJoint",
+                ["property"] = "m_ConnectedBody",
+                ["value"] = Obj2
+            });
+            Assert.IsNull(res["error"], res.ToString());
+            Assert.AreEqual(body, GameObject.Find(Obj).GetComponent<HingeJoint>().connectedBody,
+                "GameObject → компонент нужного типа");
+        }
+
+        [Test]
+        public void ModifyObject_ObjectReference_TypeMismatch_NothingApplied()
+        {
+            var so = ScriptableObject.CreateInstance<ShtlM5TestConfig>();
+            AssetDatabase.CreateAsset(so, SoPath);
+
+            // В поле Material подсовываем сам SO — тип не подходит и подобрать компонент неоткуда.
+            var res = new ModifyObjectTool().Invoke(new JObject
+            {
+                ["target"] = SoPath,
+                ["changes"] = new JArray
+                {
+                    new JObject { ["property"] = "number", ["value"] = 7 },
+                    new JObject { ["property"] = "material", ["value"] = SoPath }
+                }
+            });
+            StringAssert.Contains("value type mismatch", (string)res["error"]);
+            Assert.AreEqual(0, AssetDatabase.LoadAssetAtPath<ShtlM5TestConfig>(SoPath).number,
+                "транзакционность: валидное изменение из битого батча НЕ применено");
+        }
+
+        [Test]
+        public void ModifyObject_ObjectReference_MissingAsset_Error()
+        {
+            var so = ScriptableObject.CreateInstance<ShtlM5TestConfig>();
+            AssetDatabase.CreateAsset(so, SoPath);
+
+            var res = new ModifyObjectTool().Invoke(new JObject
+            {
+                ["target"] = SoPath,
+                ["property"] = "material",
+                ["value"] = "Assets/ShtlNoSuchMaterial.mat"
+            });
+            StringAssert.Contains("no asset at path", (string)res["error"]);
         }
 
         [Test]

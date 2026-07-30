@@ -354,3 +354,12 @@ lifecycle-and-reload. Тест `LogCaptureTests` (round-trip); EditMode-прог
 крошка была невидима свежей сессии. `ResolveTargetPath`: обход вверх до `.git` (dir/file),
 приоритет маркер → существующий CLAUDE.md ближе к git-корню → git-корень; вне git — прежнее
 поведение. Raw не менялся (AC7.4 фиксирует «CLAUDE.md host-проекта», не путь).
+
+## [2026-07-30] forward | modify_object пишет ссылочные поля | objref-write
+AC3.11 расширен пунктом (г): `modify_object` пишет `ObjectReference` — значение той же формы,
+что и `target` (scene-GO / asset-path / instanceId), `null` снимает ссылку, GameObject в поле
+компонента резолвится через `GetComponent`. Без этого модель не могла связать ассеты и держала
+Editor-скрипты в host-проекте только ради `objectReferenceValue` (повод — PerfectWar T-0064).
+`SerializedValues.Write` получил `out error` — причина отказа доезжает до ответа тула.
+EditMode 216/216. Вне scope (ограничения Unity, а не тула): встроенные ресурсы, sub-assets,
+scene-ссылка в поле ассета.
