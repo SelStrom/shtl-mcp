@@ -6,6 +6,18 @@ All notable changes to this package are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-07-30
+
+### Added
+- **`create_asset` creates binary assets.** `write_asset` only covers text files, and a material or
+  a `ScriptableObject` cannot be hand-assembled — so a model needing a new material had to keep an
+  Editor script alive in the host project. `create_asset(path, type, shader?, overwrite?)` wraps
+  `AssetDatabase.CreateAsset`: a `Material` (with a mandatory `shader` name), any `ScriptableObject`
+  subclass, or any other `UnityEngine.Object` that has a parameterless constructor. The tool only
+  *creates* the asset — its fields are then set through `modify_object`, which keeps the core thin.
+  An existing path is an error unless `overwrite: true`. Out of scope: types requiring constructor
+  arguments (`Texture2D`, `RenderTexture`).
+
 ## [0.7.0] — 2026-07-30
 
 ### Added

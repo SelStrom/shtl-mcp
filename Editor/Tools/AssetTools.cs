@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using UnityEditor;
+using UnityEngine;
 
 namespace Shtl.Mcp.Tools
 {
@@ -220,6 +221,125 @@ namespace Shtl.Mcp.Tools
                 return new JObject { ["error"] = "could not create folder (parent missing or name invalid)" };
             }
             return new JObject { ["guid"] = guid, ["path"] = AssetDatabase.GUIDToAssetPath(guid) };
+        }
+    }
+
+    /// Создать бинарный ассет (`AssetDatabase.CreateAsset`): материал, ScriptableObject и прочие
+    /// UnityEngine.Object с конструктором без параметров. Парный `write_asset` покрывает только
+    /// текстовые файлы, а такие ассеты руками не собрать — их поля правит `modify_object`.
+    public sealed class CreateAssetTool : ITool
+    {
+        public string Name => "create_asset";
+        public string Description =>
+            "Create a binary asset (AssetDatabase.CreateAsset): 'type' is a UnityEngine.Object type name " +
+            "(Material, a ScriptableObject subclass, AnimationClip, …). Material requires 'shader'. " +
+            "Path must be project-relative with the right extension ('.mat', '.asset', …). " +
+            "Set fields afterwards with modify_object. Text assets go through write_asset instead.";
+        public bool NeedsMainThread => true;
+
+        public JObject InputSchema => new JObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JObject
+            {
+                ["path"] = new JObject { ["type"] = "string", ["description"] = "Project-relative path with extension, e.g. 'Assets/Materials/Loot.mat'." },
+                ["type"] = new JObject { ["type"] = "string", ["description"] = "UnityEngine.Object type name, e.g. 'Material' or a ScriptableObject subclass." },
+                ["shader"] = new JObject { ["type"] = "string", ["description"] = "Shader name for Material, e.g. 'Universal Render Pipeline/Unlit'." },
+                ["overwrite"] = new JObject { ["type"] = "boolean", ["description"] = "Replace an existing asset at 'path' (default false)." }
+            },
+            ["required"] = new JArray { "path", "type" }
+        };
+
+        public JObject Invoke(JObject args)
+        {
+            var path = (string)args["path"];
+            if (string.IsNullOrEmpty(path))
+            {
+                return new JObject { ["error"] = "path is required" };
+            }
+            if (!path.StartsWith("Assets/", StringComparison.Ordinal))
+            {
+                return new JObject { ["error"] = "path must be under Assets/: " + path };
+            }
+            if (string.IsNullOrEmpty(Path.GetExtension(path)))
+            {
+                return new JObject { ["error"] = "path needs an extension ('.mat', '.asset', …): " + path };
+            }
+
+            bool overwrite = args["overwrite"] != null && (bool)args["overwrite"];
+            if (AssetDatabase.LoadMainAssetAtPath(path) != null)
+            {
+                if (!overwrite)
+                {
+                    return new JObject { ["error"] = "asset already exists (pass overwrite=true): " + path };
+                }
+                AssetDatabase.DeleteAsset(path);
+            }
+
+            var type = TypeResolve.Find((string)args["type"], null, typeof(UnityEngine.Object), out var typeError);
+            if (type == null)
+            {
+                return typeError;
+            }
+
+            var asset = Instantiate(type, (string)args["shader"], out var createError);
+            if (asset == null)
+            {
+                return new JObject { ["error"] = createError };
+            }
+
+            AssetDatabase.CreateAsset(asset, path);
+            AssetDatabase.SaveAssets();
+            return new JObject
+            {
+                ["created"] = true,
+                ["path"] = path,
+                ["type"] = type.FullName,
+                ["guid"] = AssetDatabase.AssetPathToGUID(path)
+            };
+        }
+
+        static UnityEngine.Object Instantiate(Type type, string shaderName, out string error)
+        {
+            error = null;
+            if (type == typeof(Material))
+            {
+                if (string.IsNullOrEmpty(shaderName))
+                {
+                    error = "'shader' is required for Material";
+                    return null;
+                }
+                var shader = Shader.Find(shaderName);
+                if (shader == null)
+                {
+                    error = "shader not found: " + shaderName;
+                    return null;
+                }
+                return new Material(shader);
+            }
+
+            if (typeof(ScriptableObject).IsAssignableFrom(type))
+            {
+                return ScriptableObject.CreateInstance(type);
+            }
+
+            // Остальные UnityEngine.Object — только те, что конструируются без аргументов
+            // (AnimationClip, PhysicMaterial, …). Прочее (Texture2D, RenderTexture) требует
+            // размеров и в задачу этого тула не входит.
+            if (type.GetConstructor(Type.EmptyTypes) == null)
+            {
+                error = "type has no parameterless constructor: " + type.FullName;
+                return null;
+            }
+            try
+            {
+                return (UnityEngine.Object)Activator.CreateInstance(type);
+            }
+            catch (Exception e)
+            {
+                error = "could not create " + type.FullName + ": " + e.Message;
+                return null;
+            }
         }
     }
 }

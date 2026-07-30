@@ -46,6 +46,7 @@ M5 (command-set v2, murzak-parity) добавил 9 инструментов и 
 | `read_asset(path)` | Сериализованные данные ассета. |
 | `write_asset(path, content, refresh?, createFolders?)` ⏳ | Создание/перезапись текстового ассета под `Assets/` — парный к `read_asset` (AC3.9). Для компилируемых (`.cs`/`.asmdef`/`.asmref`) при `refresh` — async-job (jobId; ошибки компиляции через `get_job`), остальные — синхронно. Обычный тул, не footgun. |
 | `move_asset` / `delete_asset` / `create_folder` | CRUD по AssetDatabase. |
+| `create_asset(path, type, shader?, overwrite?)` | Бинарный ассет через `AssetDatabase.CreateAsset` (AC3.15): материал (нужен `shader`), наследник `ScriptableObject`, прочие `UnityEngine.Object` с ctor без параметров. Текстовые файлы — через `write_asset`; поля созданного ассета — через `modify_object`. Существующий путь → ошибка без `overwrite`. Вне scope: типы с аргументами конструктора (`Texture2D`, `RenderTexture`). |
 
 ### Префабы
 | `create_prefab(fromGameObject, path)` | GameObject → префаб-ассет. |
