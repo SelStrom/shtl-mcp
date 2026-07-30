@@ -8,5 +8,9 @@ namespace Shtl.Mcp.Editor.Tests
     {
         public int number;
         public Vector3 vec;
+
+        // Ссылочное поле под запись ObjectReference. Только ассет: ссылку на объект сцены
+        // Unity в ассет не сериализует — сценовые ссылки проверяются на ShtlObjRefTestBehaviour.
+        public Material material;
     }
 }

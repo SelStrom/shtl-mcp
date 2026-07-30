@@ -6,6 +6,19 @@ All notable changes to this package are documented here. Format follows
 
 ## [Unreleased]
 
+### Added
+- **`modify_object` writes object-reference fields.** Previously any `ObjectReference` property
+  was rejected with `unsupported property type for write`, so a model could not wire assets
+  together (assign a material to a renderer, put a prefab into a config field, fill an authoring
+  component in a scene) and had to keep host-project Editor scripts alive solely for
+  `SerializedProperty.objectReferenceValue`. The value now takes the same forms as `target` — a
+  scene GameObject path/name, an asset path, or an instanceId — and `null` clears the reference.
+  When the field expects a `Component` but a GameObject is given, the component of that type is
+  taken from it; a type that does not fit produces a structured error and the whole
+  `modify_object` transaction is rolled back. Out of scope (Unity limitations, not the tool's):
+  built-in resources (`Library/unity default resources`), sub-assets, and scene references stored
+  into an asset field (Unity does not serialize those).
+
 ### Fixed
 - **`get_logs` no longer misses startup and pre-reload logs.** Log capture used to subscribe to
   `Application.logMessageReceivedThreaded` inside `EnsureStarted` (which runs late, on the first
