@@ -1,6 +1,6 @@
 {
   "name": "com.shtl.mcp",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "displayName": "Shtl MCP",
   "description": "Self-contained MCP (Model Context Protocol) server embedded in the Unity Editor — no external bridge process. Gives LLM agents (Claude Code etc.) HTTP/JSON-RPC control over the running Unity instance.",
   "unity": "2022.3",

@@ -6,6 +6,8 @@ All notable changes to this package are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-07-30
+
 ### Added
 - **`modify_object` writes object-reference fields.** Previously any `ObjectReference` property
   was rejected with `unsupported property type for write`, so a model could not wire assets
