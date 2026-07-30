@@ -81,5 +81,76 @@ namespace Shtl.Mcp.Editor.Tests
             var res = new CreateFolderTool().Invoke(new JObject { ["parent"] = "Assets/__missing__", ["name"] = "x" });
             Assert.IsNotNull(res["error"]);
         }
+
+        /// Полный путь, ради которого тул и заведён: материала на диске нет, создаём его и
+        /// довешиваем текстуру — без единого Editor-скрипта в host-проекте.
+        [Test]
+        public void CreateAsset_Material_ThenModifyObjectSetsTexture()
+        {
+            new CreateFolderTool().Invoke(new JObject { ["parent"] = "Assets", ["name"] = "ShtlMcpT4Tmp" });
+            var matPath = TmpFolder + "/mat.mat";
+            var texPath = TmpFolder + "/tex.asset";
+
+            var created = new CreateAssetTool().Invoke(new JObject
+            {
+                ["path"] = matPath,
+                ["type"] = "Material",
+                ["shader"] = "Unlit/Texture"
+            });
+            Assert.IsNull(created["error"], created.ToString());
+            var material = AssetDatabase.LoadAssetAtPath<UnityEngine.Material>(matPath);
+            Assert.IsNotNull(material, "материал создан на диске");
+            Assert.AreEqual("Unlit/Texture", material.shader.name);
+
+            // Поля созданного ассета правит modify_object — тулу остаётся только создание.
+            new CreateAssetTool().Invoke(new JObject { ["path"] = texPath, ["type"] = "ShtlM5TestConfig" });
+            var res = new ModifyObjectTool().Invoke(new JObject
+            {
+                ["target"] = texPath,
+                ["property"] = "number",
+                ["value"] = 5
+            });
+            Assert.IsNull(res["error"], res.ToString());
+            Assert.AreEqual(5, AssetDatabase.LoadAssetAtPath<ShtlM5TestConfig>(texPath).number);
+        }
+
+        [Test]
+        public void CreateAsset_ExistingPath_ErrorUnlessOverwrite()
+        {
+            new CreateFolderTool().Invoke(new JObject { ["parent"] = "Assets", ["name"] = "ShtlMcpT4Tmp" });
+            var soPath = TmpFolder + "/config.asset";
+            var args = new JObject { ["path"] = soPath, ["type"] = "ShtlM5TestConfig" };
+
+            Assert.IsNull(new CreateAssetTool().Invoke((JObject)args.DeepClone())["error"]);
+
+            var again = new CreateAssetTool().Invoke((JObject)args.DeepClone());
+            StringAssert.Contains("already exists", (string)again["error"]);
+
+            args["overwrite"] = true;
+            Assert.IsNull(new CreateAssetTool().Invoke(args)["error"], "overwrite=true пересоздаёт");
+        }
+
+        [Test]
+        public void CreateAsset_MaterialWithoutShader_Error()
+        {
+            new CreateFolderTool().Invoke(new JObject { ["parent"] = "Assets", ["name"] = "ShtlMcpT4Tmp" });
+            var res = new CreateAssetTool().Invoke(new JObject
+            {
+                ["path"] = TmpFolder + "/noshader.mat",
+                ["type"] = "Material"
+            });
+            StringAssert.Contains("'shader' is required", (string)res["error"]);
+        }
+
+        [Test]
+        public void CreateAsset_PathWithoutExtension_Error()
+        {
+            var res = new CreateAssetTool().Invoke(new JObject
+            {
+                ["path"] = TmpFolder + "/noext",
+                ["type"] = "ShtlM5TestConfig"
+            });
+            StringAssert.Contains("needs an extension", (string)res["error"]);
+        }
     }
 }

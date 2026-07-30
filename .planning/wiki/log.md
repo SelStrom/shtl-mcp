@@ -363,3 +363,10 @@ Editor-скрипты в host-проекте только ради `objectRefere
 `SerializedValues.Write` получил `out error` — причина отказа доезжает до ответа тула.
 EditMode 216/216. Вне scope (ограничения Unity, а не тула): встроенные ресурсы, sub-assets,
 scene-ссылка в поле ассета.
+
+## [2026-07-30] forward | create_asset — бинарные ассеты | create-asset
+AC3.15: `create_asset` создаёт материал (нужен `shader`), наследника `ScriptableObject` и прочие
+`UnityEngine.Object` с ctor без параметров — `write_asset` покрывает только текст, а такой ассет
+руками не собрать. Тул только создаёт: поля правит `modify_object`, чем сохраняется тонкое ядро.
+Повод — `CreateLootGhostPrefabsTool` в PerfectWar, Editor-скрипт ради трёх материалов.
+EditMode 220/220. Вне scope: типы с аргументами конструктора (`Texture2D`, `RenderTexture`).

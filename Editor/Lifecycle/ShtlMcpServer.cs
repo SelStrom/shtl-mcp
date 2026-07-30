@@ -139,6 +139,7 @@ namespace Shtl.Mcp.Lifecycle
             _tools.Register(new MoveAssetTool());
             _tools.Register(new DeleteAssetTool());
             _tools.Register(new CreateFolderTool());
+            _tools.Register(new CreateAssetTool());
             _tools.Register(new CreatePrefabTool());
             _tools.Register(new OpenPrefabTool());
             _tools.Register(new SavePrefabTool());
