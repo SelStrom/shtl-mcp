@@ -6,6 +6,33 @@ All notable changes to this package are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-07-31
+
+### Added
+- **The open prefab stage is now the working context for object tools.** While a prefab stage is open,
+  `get_hierarchy`, `find_gameobject`, `instantiate_prefab` and every `target`/`parent` lookup
+  (`gameobject_*`, `set_parent`, `add_component`, `get_object`/`modify_object`) address the stage
+  contents instead of the active scene — the same thing the editor itself does, where the Hierarchy
+  shows the prefab and scene objects are out of reach. Without it, editing a prefab over MCP was
+  impossible: a model would get `target not found` for an object `get_selection` had just returned,
+  and had to keep a `LoadPrefabContents` + `SerializedObject` Editor script alive in the host project.
+- **`context` in responses.** `get_hierarchy`, `find_gameobject` and `instantiate_prefab` report where
+  they ran (`scene` | `prefabStage` + the asset path), so an empty result reads as "looked in the wrong
+  place" rather than "the object does not exist".
+- **`instantiate_prefab(parent)`.** Parents the new instance to an object of the current context,
+  keeping the prefab's authored local transform — preserving the world transform instead would break
+  `RectTransform` anchors for UI. The response now also carries the instance `path`.
+
+### Fixed
+- **`close_prefab` no longer opens a blocking dialog.** With unsaved stage changes it used to reach
+  `StageUtility.GoToMainStage()`, which raises Unity's "Prefab Has Been Modified" modal: interactively
+  that wedges the main thread until a human dismisses it, and in batch mode Unity cancels the dialog,
+  leaves the stage open and poisons every following test. The new `policy` follows the vocabulary
+  already used by `run_tests`: `discard` (default) | `save` | `abort`. There is no public API for
+  clearing the stage dirty flag on either 2022 or 6, so it goes through internal reflection
+  (`PrefabStage.ClearDirtiness`, falling back to `EditorSceneManager.ClearSceneDirtiness`); if neither
+  is found the tool refuses with a clear error instead of falling through into the modal.
+
 ## [0.8.0] — 2026-07-30
 
 ### Added

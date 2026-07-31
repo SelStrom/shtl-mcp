@@ -106,6 +106,21 @@ Unity: перекомпиляция, префабы, play/edit, ассеты, т
   ассет, поля правит `modify_object` (AC3.11). Существующий путь → ошибка, если
   не передан `overwrite`. Типы, требующие аргументов конструктора (`Texture2D`,
   `RenderTexture`), — вне scope, как и материалы/шейдеры-специфика ниже.
+- **AC3.16** — **prefab-stage как контекст работы**: пока открыт prefab-stage,
+  объектные тулы (`get_hierarchy`, `find_gameobject`, резолв `target`/`parent` у
+  `gameobject_*`, `set_parent`, `add_component`, `get_object`/`modify_object`,
+  `instantiate_prefab`) работают по содержимому стейджа, а не по активной сцене.
+  Так же ведёт себя сам Unity: пока стейдж открыт, Hierarchy показывает префаб,
+  а объекты сцены недостижимы. Без этого редактирование префаба через MCP
+  невозможно в принципе — тулы отвечают `target not found` на объект, который
+  модель только что увидела в `get_selection`, и она вынуждена держать в
+  host-проекте Editor-скрипт на `LoadPrefabContents` + `SerializedObject`.
+  Ответы `get_hierarchy`/`find_gameobject`/`instantiate_prefab` несут поле
+  `context` (`scene` | `prefabStage` + путь ассета), чтобы пустой результат
+  читался как «искал не там», а не «объекта нет». `instantiate_prefab` принимает
+  `parent` (объект текущего контекста) и сохраняет авторский локальный трансформ
+  префаба — для UI сохранение мирового вместо локального ломает якоря
+  `RectTransform`.
 
 ## Out of scope (v2+, достижимо через escape hatches)
 - Профайлер, packages CRUD, материалы/шейдеры-специфика, isolated-screenshot,

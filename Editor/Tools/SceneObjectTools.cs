@@ -7,10 +7,50 @@ using UnityEngine.SceneManagement;
 
 namespace Shtl.Mcp.Tools
 {
-    /// Общие операции над объектами активной сцены: резолв по пути (`A/B/C`) или имени (вкл. неактивные),
-    /// путь объекта, JSON-описание, обход иерархии.
+    /// Общие операции над объектами текущего контекста редактирования: резолв по пути (`A/B/C`) или
+    /// имени (вкл. неактивные), путь объекта, JSON-описание, обход иерархии.
+    /// Контекст — открытый prefab-stage, иначе активная сцена (AC3.16): пока стейдж открыт, Unity и в
+    /// своей Hierarchy показывает его, а не сцену, поэтому тулы следуют за тем же контекстом.
     internal static class SceneObjects
     {
+        /// Открытый prefab-stage или null. Единственная точка знания о стейдже.
+        public static PrefabStage CurrentStage()
+        {
+            return PrefabStageUtility.GetCurrentPrefabStage();
+        }
+
+        /// Где сейчас работают тулы — чтобы «объект не найден» не выглядел загадкой.
+        public static JObject ContextInfo()
+        {
+            var stage = CurrentStage();
+            if (stage != null)
+            {
+                return new JObject
+                {
+                    ["kind"] = "prefabStage",
+                    ["prefabPath"] = stage.assetPath,
+                    ["root"] = stage.prefabContentsRoot != null ? stage.prefabContentsRoot.name : null,
+                    ["dirty"] = stage.scene.isDirty
+                };
+            }
+            var active = SceneManager.GetActiveScene();
+            return new JObject
+            {
+                ["kind"] = "scene",
+                ["scene"] = active.name,
+                // пусто = сцена ни разу не сохранялась (untitled)
+                ["scenePath"] = active.path,
+                ["dirty"] = active.isDirty
+            };
+        }
+
+        /// Сцена, куда попадают новые объекты: стейджа, если открыт, иначе активная.
+        public static Scene TargetScene()
+        {
+            var stage = CurrentStage();
+            return stage != null ? stage.scene : SceneManager.GetActiveScene();
+        }
+
         public static GameObject Resolve(string target)
         {
             if (string.IsNullOrEmpty(target))
@@ -50,7 +90,7 @@ namespace Shtl.Mcp.Tools
 
         static GameObject[] Roots()
         {
-            return SceneManager.GetActiveScene().GetRootGameObjects();
+            return TargetScene().GetRootGameObjects();
         }
 
         public static IEnumerable<GameObject> All()
@@ -154,13 +194,14 @@ namespace Shtl.Mcp.Tools
         }
     }
 
-    /// Дерево объектов активной сцены (опц. от корня `root`, глубина `maxDepth`).
+    /// Дерево объектов текущего контекста (опц. от корня `root`, глубина `maxDepth`).
     public sealed class GetHierarchyTool : ITool
     {
         public string Name => "get_hierarchy";
         public string Description =>
-            "Dump the active scene hierarchy as a tree (name, active, children). Optional 'root' scopes to " +
-            "a subtree; 'maxDepth' limits depth (default 5).";
+            "Dump the current editing context as a tree (name, active, children): the open prefab stage if " +
+            "there is one, otherwise the active scene. 'context' in the response says which. Optional 'root' " +
+            "scopes to a subtree; 'maxDepth' limits depth (default 5).";
         public bool NeedsMainThread => true;
 
         public JObject InputSchema => new JObject
@@ -186,24 +227,30 @@ namespace Shtl.Mcp.Tools
                     return new JObject { ["error"] = "root not found: " + root };
                 }
             }
-            var active = SceneManager.GetActiveScene();
+            // Поля scene* берутся из контекста, а не из активной сцены: при открытом стейдже дерево — его,
+            // и рассинхрон заголовка с содержимым читался бы как «объектов сцены нет».
+            var target = SceneObjects.TargetScene();
             return new JObject
             {
-                ["scene"] = active.name,
-                ["scenePath"] = active.path, // пусто = сцена ни разу не сохранялась (untitled)
+                ["context"] = SceneObjects.ContextInfo(),
+                ["scene"] = target.name,
+                ["scenePath"] = target.path, // пусто = сцена ни разу не сохранялась (untitled) или это стейдж
                 // sceneDirty (AC4.9): LLM решает проактивно — сохранить через save_scene перед разрушающей
                 // операцией (open_scene/recompile молча отбросят несохранённое; блокирующего модала нет).
-                ["sceneDirty"] = active.isDirty,
+                ["sceneDirty"] = target.isDirty,
                 ["tree"] = SceneObjects.RootNodes(scope, maxDepth)
             };
         }
     }
 
-    /// Найти объекты сцены по имени (вкл. неактивные).
+    /// Найти объекты текущего контекста по имени (вкл. неактивные).
     public sealed class FindGameObjectTool : ITool
     {
         public string Name => "find_gameobject";
-        public string Description => "Find scene GameObjects by exact name (including inactive). Returns path, active, components.";
+        public string Description =>
+            "Find GameObjects by exact name (including inactive) in the current editing context — the open " +
+            "prefab stage if there is one, otherwise the active scene. Returns path, active, components, " +
+            "and 'context' saying where the search ran.";
         public bool NeedsMainThread => true;
 
         public JObject InputSchema => new JObject
@@ -231,6 +278,8 @@ namespace Shtl.Mcp.Tools
             }
             return new JObject
             {
+                // context: пустой результат при открытом стейдже — почти всегда «искал не там», а не «нет объекта»
+                ["context"] = SceneObjects.ContextInfo(),
                 ["count"] = all.Count,
                 ["truncated"] = all.Count > 200,
                 ["matches"] = matches

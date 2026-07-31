@@ -50,12 +50,19 @@ M5 (command-set v2, murzak-parity) добавил 9 инструментов и 
 
 ### Префабы
 | `create_prefab(fromGameObject, path)` | GameObject → префаб-ассет. |
-| `open_prefab(path)` / `save_prefab` / `close_prefab` | Редактирование в prefab-stage. |
-| `instantiate_prefab(path, parent?)` | Инстанс префаба в сцену. |
+| `open_prefab(path)` / `save_prefab` / `close_prefab` | Редактирование в prefab-stage. Пока стейдж открыт, он — **контекст** для объектных тулов (AC3.16). |
+| `instantiate_prefab(path, parent?)` | Инстанс префаба в текущий контекст (стейдж, иначе активная сцена). `parent` — объект того же контекста; локальный трансформ берётся авторский из префаба (мировой сломал бы якоря `RectTransform`). Возвращает `path` инстанса и `context`. |
 
 ### Сцена / иерархия / объекты
-| `get_hierarchy(scene?)` | Дерево объектов. |
-| `find_gameobject(query)` | Поиск GameObject. |
+> **Контекст работы (AC3.16).** Все тулы этой секции адресуют объекты **текущего контекста**: открытый
+> prefab-stage, иначе активная сцена. Единственная точка знания — `SceneObjects.Roots()`, поэтому резолв
+> по пути/имени, обход иерархии и создание объектов переключаются вместе. Так же ведёт себя Unity: при
+> открытом стейдже Hierarchy показывает префаб, а объекты сцены недостижимы. `get_hierarchy`,
+> `find_gameobject` и `instantiate_prefab` возвращают `context` (`scene` | `prefabStage` + путь ассета) —
+> без него пустой результат читается как «объекта нет» вместо «искал не там».
+
+| `get_hierarchy(scene?)` | Дерево объектов текущего контекста. |
+| `find_gameobject(query)` | Поиск GameObject в текущем контексте. |
 | `gameobject_create / gameobject_modify / gameobject_destroy` | CRUD GameObject. |
 | `set_parent(child, parent)` | Репарентинг. |
 | `add_component(target, type)` / `remove_component(target, type, index?)` | Жизненный цикл компонента (AC3.10) — дополняет `modify_object` (тот пишет свойства, но не создаёт/не удаляет компонент). Тип не найден → ошибка со списком-подсказкой; `DisallowMultipleComponent`/`RequireComponent` — внятная ошибка. |
