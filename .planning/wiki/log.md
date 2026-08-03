@@ -370,3 +370,14 @@ AC3.15: `create_asset` создаёт материал (нужен `shader`), н
 руками не собрать. Тул только создаёт: поля правит `modify_object`, чем сохраняется тонкое ядро.
 Повод — `CreateLootGhostPrefabsTool` в PerfectWar, Editor-скрипт ради трёх материалов.
 EditMode 220/220. Вне scope: типы с аргументами конструктора (`Texture2D`, `RenderTexture`).
+
+## [2026-07-31] forward | prefab-stage как контекст объектных тулов | prefab-stage-context
+AC3.16: пока открыт prefab-stage, `get_hierarchy` / `find_gameobject` / резолв `target`-`parent` /
+`instantiate_prefab` адресуют его содержимое, а не активную сцену — как и Hierarchy самого Unity.
+Правка одной функции: `SceneObjects.Roots()` → `TargetScene()`; ответы несут `context`
+(`scene` | `prefabStage`), иначе пустой результат читается как «объекта нет». Плюс `parent`
+у `instantiate_prefab` (авторский локальный трансформ — мировой ломает якоря `RectTransform`).
+Повод — Editor-скрипт на 934 строки в host-проекте, написанный ради внутрипрефабных ссылок.
+Попутно починен `close_prefab`: грязный стейдж поднимал модалку и вешал главный поток (в batch —
+ронял 20 тестов из 227 каскадом); политика `discard`|`save`|`abort`, как у `run_tests`. EditMode 229/230; единственное падение — `RegistryStoreConcurrencyTests` вне зоны правки, в изоляции проходит (флак под нагрузкой).
+
