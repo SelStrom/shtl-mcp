@@ -59,5 +59,13 @@ namespace Shtl.Mcp.Editor.Tests
             Assert.AreEqual("/main", store.LivePathForName("unity-perfectwar", TimeSpan.FromSeconds(30)));
             Assert.IsNull(store.LivePathForName("unity-other", TimeSpan.FromSeconds(30)));
         }
+
+        [Test] public void NameForPath_IgnoresHeartbeatAge()
+        {
+            var store = new RegistryStore(_file);
+            store.Upsert(Entry("/main", "perfectwar", DateTime.UtcNow - TimeSpan.FromDays(3)));
+            Assert.AreEqual("unity-perfectwar", store.NameForPath("/main"));
+            Assert.IsNull(store.NameForPath("/never-started"));
+        }
     }
 }

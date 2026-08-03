@@ -6,6 +6,22 @@ All notable changes to this package are documented here. Format follows
 
 ## [Unreleased]
 
+### Fixed
+- **`serverName` is now pinned to the project path.** It used to be recomputed on every start from
+  whoever was alive at that moment, so the bare `unity-<productName>` was a lease won by launch order:
+  clones share one product name, and the instance that opened Unity first took it. Since the client
+  entry created by `claude mcp add` is keyed by name while the port is derived from the path, a name
+  that migrated made an already-registered address point at a different project, and re-adding from the
+  dashboard produced a second name for the same instance. The name is now assigned once and reused from
+  the registry (`RegistryStore.NameForPath`, no TTL — entries outlive a stopped editor), so an instance
+  keeps its identity across restarts regardless of which sibling checkouts are running.
+
+### Changed
+- **Readable discriminator for new instances.** When the base name is taken, a path that has never
+  registered before now gets `unity-<project folder name>` instead of a path hash; the `-<hash4>`
+  suffix remains the fallback when the folder name collides too. Existing instances are unaffected —
+  their names come from the registry.
+
 ## [0.9.0] — 2026-07-31
 
 ### Added
