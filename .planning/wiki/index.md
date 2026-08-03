@@ -94,6 +94,10 @@
 - [log-capture-early-persist](tasks/log-capture-early-persist/TASK.md) — F4/AC4.11: `get_logs` был пуст при
   непустой Console — подписка в `EnsureStarted` (поздняя) + буфер как поле статик-синглтона (гибнет на
   reload). Фикс: `LogCapture` — ранняя подписка из `[InitializeOnLoad]` + персист буфера через `SessionState`.
+- [sticky-server-name](tasks/sticky-server-name/TASK.md) — forward F1/AC1.3+AC1.8: `serverName` вычислялся
+  на каждом старте, поэтому базовое имя было арендой по порядку запуска и уезжало на другой checkout, а
+  клиентская запись `claude mcp add` ключуется именем. Имя закрепляется за `projectPath` через реестр
+  (`NameForPath`, без TTL); минт нового — базовое → имя папки → hash4.
 
 ## Планы вех
 - [m2-plan](m2-plan.md) — декомпозиция M2 (полный тулсет + async-job + control-flag + config +

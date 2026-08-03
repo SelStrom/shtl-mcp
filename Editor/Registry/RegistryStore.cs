@@ -89,6 +89,13 @@ namespace Shtl.Mcp.Registry
                 x.ServerName == serverName && now - x.LastHeartbeat <= ttl)?.ProjectPath;
         }
 
+        /// Имя, закреплённое за путём прошлыми запусками. Без TTL: запись переживает остановку Unity
+        /// (записи не удаляются), поэтому имя инстанса не зависит от того, кто сейчас поднят.
+        public string NameForPath(string projectPath)
+        {
+            return Read().FirstOrDefault(x => x.ProjectPath == projectPath)?.ServerName;
+        }
+
         public static List<InstanceEntry> Prune(List<InstanceEntry> list, DateTime now, TimeSpan ttl)
             => list.Where(x => now - x.LastHeartbeat <= ttl).ToList();
 

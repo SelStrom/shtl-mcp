@@ -96,7 +96,7 @@ namespace Shtl.Mcp.Lifecycle
 
             Port = ResolvePort();
             _serverName = Shtl.Mcp.Common.ServerName.Resolve(Application.productName, ProjectPath,
-                name => _registry.LivePathForName(name, Ttl));
+                name => _registry.LivePathForName(name, Ttl), _registry.NameForPath(ProjectPath));
 
             // Снимок reload-стабильных полей для bg-heartbeat (main-thread чтения — здесь, не в фоне).
             _hbProjectName = Application.productName;
