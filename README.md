@@ -98,7 +98,7 @@ client to refresh its tool list. Working example: `TestProject~/Assets/Editor/Ho
 | Assets | `refresh_assets`, `find_assets`, `read_asset`, `write_asset` (text assets & scripts; compiled extensions go through the reload job, compile errors via `get_job`), `move_asset`, `delete_asset`, `create_folder` |
 | Prefabs | `create_prefab`, `open_prefab`, `save_prefab`, `close_prefab`, `instantiate_prefab` |
 | Scenes (multi-scene) | `open_scene`, `save_scene`, `list_scenes`, `create_scene`, `unload_scene`, `set_active_scene` |
-| GameObjects & components | `get_hierarchy`, `find_gameobject`, `gameobject_create`, `gameobject_destroy`, `gameobject_modify`, `add_component`, `remove_component`, `get_object`, `modify_object` (bulk + nested property paths, targets scene objects / assets / instanceIds), `set_parent`, `get_selection`, `set_selection` |
+| GameObjects & components | `get_hierarchy`, `find_gameobject`, `gameobject_create`, `gameobject_destroy`, `gameobject_modify`, `add_component`, `remove_component`, `get_object`, `modify_object` (bulk + nested property paths, targets scene objects / assets / instanceIds), `set_parent`, `get_selection`, `set_selection` (scene objects or asset paths) |
 | Reflection | `call_method` (existing C# methods, static/instance incl. private), `find_method` (overload discovery) |
 | Capture | `screenshot` (Game/Scene view, a named camera, or `overlay:true` for the composited Screen-Space UI in Play mode — as MCP image content), `screenshot_uxml` (render a UXML asset to a PNG offscreen in Edit mode, no Play mode) |
 | Escape hatches | `execute_menu_item`, `run_csharp` (footgun-gated, human-only) |
