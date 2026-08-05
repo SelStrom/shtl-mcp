@@ -285,5 +285,24 @@ namespace Shtl.Mcp.Editor.Tests
             var get = new GetSelectionTool().Invoke(new JObject());
             StringAssert.Contains(Obj, get["selection"].ToString());
         }
+
+        [Test]
+        public void Selection_SetAssetPath()
+        {
+            var so = ScriptableObject.CreateInstance<ShtlM5TestConfig>();
+            AssetDatabase.CreateAsset(so, SoPath);
+
+            var set = new SetSelectionTool().Invoke(new JObject { ["target"] = SoPath });
+            Assert.AreEqual(1, (int)set["selected"], set.ToString());
+            Assert.AreEqual(AssetDatabase.LoadAssetAtPath<Object>(SoPath), Selection.objects[0]);
+        }
+
+        [Test]
+        public void Selection_MissingTarget_Reported()
+        {
+            var set = new SetSelectionTool().Invoke(new JObject { ["target"] = "Assets/ShtlNoSuchAsset.asset" });
+            Assert.AreEqual(0, (int)set["selected"]);
+            StringAssert.Contains("ShtlNoSuchAsset", set["missing"].ToString());
+        }
     }
 }

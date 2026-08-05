@@ -69,7 +69,7 @@ M5 (command-set v2, murzak-parity) добавил 9 инструментов и 
 | `get_object(ref)` / `modify_object(ref, changes)` | Обобщённое чтение/запись через `SerializedObject` — компактно покрывает компоненты и поля (вместо россыпи component_*). M5 (AC3.11): bulk-массив изменений + вложенные пути (`m_Size.x`) в одной транзакции; target — scene-GO, asset-path или instanceId (ScriptableObject/материал/конфиг); настраиваемая глубина чтения. AC3.11г: пишутся ссылочные поля (`ObjectReference`) — значение той же формы, что и target, `null` снимает ссылку; поле ждёт компонент, а указан GameObject → берётся компонент с него; неподходящий тип → ошибка, транзакция откатывается. Вне scope: встроенные ресурсы Unity и ссылка на объект сцены в поле ассета (Unity её не сериализует). |
 | `open_scene(path)` / `save_scene` | Сцены. |
 | `list_scenes` / `create_scene` / `unload_scene` / `set_active_scene` | Multi-scene (AC3.13): открытые сцены (path/isLoaded/isActive/isDirty), создание (опц. сохранение в asset), выгрузка, активная сцена. Аддитивные сценарии поверх `open_scene`/`save_scene`. |
-| `get_selection` / `set_selection` | Выделение в Editor. |
+| `get_selection` / `set_selection` | Выделение в Editor. `set_selection` принимает и путь/имя объекта текущего контекста, и asset-path (та же форма target, что у `get_object`/`modify_object`); объект контекста приоритетнее. |
 
 ### Тесты
 | `run_tests(mode, filter)` ⏳ | EditMode/PlayMode тесты → результаты. |

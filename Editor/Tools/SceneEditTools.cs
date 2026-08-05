@@ -594,11 +594,11 @@ namespace Shtl.Mcp.Tools
         }
     }
 
-    /// Установить выделение из путей/имён объектов сцены.
+    /// Установить выделение из путей/имён объектов сцены или из путей ассетов.
     public sealed class SetSelectionTool : ITool
     {
         public string Name => "set_selection";
-        public string Description => "Set the editor selection from GameObject paths or names ('targets' array, or single 'target').";
+        public string Description => "Set the editor selection from GameObject paths/names or asset paths ('targets' array, or single 'target').";
         public bool NeedsMainThread => true;
 
         public JObject InputSchema => new JObject
@@ -606,8 +606,8 @@ namespace Shtl.Mcp.Tools
             ["type"] = "object",
             ["properties"] = new JObject
             {
-                ["targets"] = new JObject { ["type"] = "array", ["description"] = "GameObject paths or names." },
-                ["target"] = new JObject { ["type"] = "string", ["description"] = "Single GameObject path or name." }
+                ["targets"] = new JObject { ["type"] = "array", ["description"] = "GameObject paths/names or asset paths." },
+                ["target"] = new JObject { ["type"] = "string", ["description"] = "Single GameObject path/name or asset path." }
             }
         };
 
@@ -635,6 +635,13 @@ namespace Shtl.Mcp.Tools
                 if (go != null)
                 {
                     objs.Add(go);
+                    continue;
+                }
+
+                var asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(name);
+                if (asset != null)
+                {
+                    objs.Add(asset);
                 }
                 else
                 {

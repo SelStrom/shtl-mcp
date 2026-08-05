@@ -6,6 +6,17 @@ All notable changes to this package are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-08-05
+
+### Added
+- **`set_selection` accepts asset paths.** It used to resolve a target only as an object of the current
+  context, so an asset path came back in `missing` — the one tool left out of the common target form
+  (`get_object`/`modify_object` have taken context object / asset path / instanceId since 0.5.0).
+  Selection is the input for editor actions that have no other API: `MenuItem`s driven by
+  `Selection.objects`, and showing an asset to a human in the Project window. Neither was reachable for
+  an asset without `run_csharp` — a tool behind the footgun flag. A context object still wins over an
+  asset path, so calls that worked before behave the same; an unresolved string still lands in `missing`.
+
 ### Fixed
 - **`serverName` is now pinned to the project path.** It used to be recomputed on every start from
   whoever was alive at that moment, so the bare `unity-<productName>` was a lease won by launch order:
