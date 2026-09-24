@@ -33,7 +33,8 @@ namespace Shtl.Mcp.Tools
 
         public string Description =>
             "Run EditMode or PlayMode tests via the Unity Test Runner. Async: returns a jobId immediately; " +
-            "poll get_job(jobId) for results (passed/failed/skipped counts + failures). Survives domain reload.";
+            "poll get_job(jobId) for results (passed/failed/skipped/inconclusive counts, failures + inconclusiveTests; " +
+            "status is the worst outcome: Failed > Inconclusive > Skipped > Passed). Survives domain reload.";
 
         public bool NeedsMainThread => true;
 

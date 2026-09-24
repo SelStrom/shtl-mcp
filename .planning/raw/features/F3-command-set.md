@@ -32,6 +32,11 @@ Unity: перекомпиляция, префабы, play/edit, ассеты, т
   описание, отдаётся в `tools/list`.
 - **AC3.5** — Долгие/reload-команды (`set_play_mode`, `recompile`, `run_tests`,
   тяжёлый `refresh_assets`) возвращают `jobId`; результат — через `get_job`.
+  Результат `run_tests` различает все исходы Test Runner'а: счётчики passed /
+  failed / skipped / inconclusive, имена и сообщения упавших и inconclusive-тестов,
+  `status` — худший исход (Failed > Inconclusive > Skipped > Passed). Inconclusive
+  (в т.ч. от невыполненного `Assume`) никогда не выглядит как Passed: по ответу
+  host-проект строит гейт «0 failed, 0 inconclusive».
 - **AC3.6** — **Кастомные инструменты хоста без форка.** Host-проект добавляет свой
   MCP-инструмент, положив в СВОЮ Editor-сборку класс, реализующий `ITool` и помеченный
   `[McpTool]` (оба из `Shtl.Mcp.Tools`). Без правок кода shtl-mcp и без ручной

@@ -413,3 +413,11 @@ F3/AC3.1: резолв target'а в `set_selection` стал двухступе�
 Проверено на живом инстансе (asset выделен, несуществующий путь в `missing`); EditMode не гонялся —
 тестовая сборка под `SHTL_MCP_DEV`, `TestProject~` не поднят. Релиз 0.10.0 — вместе с накопленным
 `Unreleased` (sticky serverName).
+
+
+## [2026-09-24] forward | run_tests различает Inconclusive | run-tests-inconclusive
+AC3.5 дополнен формой результата `run_tests`: счётчик `inconclusive`, список `inconclusiveTests`,
+`status` — худший исход по счётчикам вместо `TestStatus` корня (NUnit сворачивал Passed+Inconclusive
+и даже сьют из одних Inconclusive в Passed — измерено пробой). Сбой уровня сьюта (`OneTimeTearDown`,
+`FailCount 0`) остаётся Failed. Повод — гейт host-проекта «0 failed, 0 inconclusive» по `get_job`.
+EditMode 244/244 + сквозная проба 5 сценариев. Release 0.10.1.

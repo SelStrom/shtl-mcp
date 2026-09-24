@@ -72,7 +72,7 @@ M5 (command-set v2, murzak-parity) добавил 9 инструментов и 
 | `get_selection` / `set_selection` | Выделение в Editor. `set_selection` принимает и путь/имя объекта текущего контекста, и asset-path (та же форма target, что у `get_object`/`modify_object`); объект контекста приоритетнее. |
 
 ### Тесты
-| `run_tests(mode, filter)` ⏳ | EditMode/PlayMode тесты → результаты. |
+| `run_tests(mode, filter)` ⏳ | EditMode/PlayMode тесты → результаты: `passed/failed/skipped/inconclusive`, `failures` и `inconclusiveTests` (`{name, message}`), `status` — худший исход Failed > Inconclusive > Skipped > Passed (AC3.5). Статус считается по счётчикам, а не берётся с корня дерева: NUnit сворачивает Inconclusive-детей сьюта в Passed; сбой уровня сьюта (`OneTimeTearDown`) даёт Failed при `failed: 0`. Job-статус от исхода тестов не зависит (`done`). |
 
 ### Reflection (AC3.12)
 | `call_method(type, method, parameterTypes?, args?, target?, assembly?)` | Вызов существующего C#-метода (static/instance, вкл. private) по типу и сигнатуре. Обычный тул, не footgun: вызов существующего метода безопаснее компиляции произвольного кода (`run_csharp`). |

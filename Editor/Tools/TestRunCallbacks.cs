@@ -85,41 +85,67 @@ namespace Shtl.Mcp.Tools
                 return;
             }
 
-            var failures = new JArray();
-            Collect(result, failures);
-            var payload = new JObject
-            {
-                ["passed"] = result.PassCount,
-                ["failed"] = result.FailCount,
-                ["skipped"] = result.SkipCount,
-                ["status"] = result.TestStatus.ToString(),
-                ["failures"] = failures
-            };
-            _jobs.Complete(jobId, payload.ToString());
+            _jobs.Complete(jobId, BuildPayload(result).ToString());
             SessionState.EraseString(RunTestsTool.JobMarkerKey);
             TestRunnerNoThrottle.Restore(); // вернуть троттлинг (внутри marker-guard → дубли колбэков не двойнят)
             PlayModeOptionsGuard.Restore();  // вернуть enterPlayModeOptions (идемпотентно: EditMode-прогон не трогал)
         }
 
-        // Обходим дерево результатов, собираем упавшие листья (имя + сообщение).
-        static void Collect(ITestResultAdaptor result, JArray acc)
+        // status — худший исход по счётчикам, а не TestStatus корня: NUnit сворачивает Inconclusive-детей
+        // сьюта в Passed (сьют из одних Inconclusive тоже Passed), и Inconclusive выглядел бы как успех.
+        internal static JObject BuildPayload(ITestResultAdaptor root)
+        {
+            var failures = new JArray();
+            var inconclusive = new JArray();
+            Collect(root, failures, inconclusive);
+            return new JObject
+            {
+                ["passed"] = root.PassCount,
+                ["failed"] = root.FailCount,
+                ["skipped"] = root.SkipCount,
+                ["inconclusive"] = root.InconclusiveCount,
+                ["status"] = WorstStatus(root).ToString(),
+                ["failures"] = failures,
+                ["inconclusiveTests"] = inconclusive
+            };
+        }
+
+        static TestStatus WorstStatus(ITestResultAdaptor root)
+        {
+            if (root.FailCount > 0 || root.TestStatus == TestStatus.Failed) // сбой уровня сьюта (OneTimeTearDown) не в FailCount
+            {
+                return TestStatus.Failed;
+            }
+            if (root.InconclusiveCount > 0)
+            {
+                return TestStatus.Inconclusive;
+            }
+            if (root.SkipCount > 0)
+            {
+                return TestStatus.Skipped;
+            }
+            return TestStatus.Passed;
+        }
+
+        // Обходим дерево результатов, собираем упавшие и inconclusive-листья (имя + сообщение).
+        static void Collect(ITestResultAdaptor result, JArray failures, JArray inconclusive)
         {
             if (result.HasChildren)
             {
                 foreach (var child in result.Children)
                 {
-                    Collect(child, acc);
+                    Collect(child, failures, inconclusive);
                 }
                 return;
             }
-            if (result.TestStatus == TestStatus.Failed)
+            var acc = result.TestStatus == TestStatus.Failed ? failures
+                : result.TestStatus == TestStatus.Inconclusive ? inconclusive
+                : null;
+            acc?.Add(new JObject
             {
-                acc.Add(new JObject
-                {
-                    ["name"] = result.FullName,
-                    ["message"] = result.Message
-                });
-            }
+                ["name"] = result.FullName,
+                ["message"] = result.Message
+            });
         }
     }
 }

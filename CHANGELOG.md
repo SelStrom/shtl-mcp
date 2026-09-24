@@ -6,6 +6,17 @@ All notable changes to this package are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-09-24
+
+### Fixed
+- **`run_tests` no longer reports inconclusive tests as passed.** The result carried only
+  passed/failed/skipped counts and the root `TestStatus`, which NUnit aggregates to `Passed` for a
+  suite whose children are passed + inconclusive — and even for a suite of inconclusive tests only.
+  An `Assert.Inconclusive` or an unmet `Assume.That` was therefore invisible: a gate like
+  "0 failed, 0 inconclusive" could not be checked from `get_job`. The result now adds an
+  `inconclusive` count and an `inconclusiveTests` list (`{name, message}`, like `failures`), and
+  `status` is the worst outcome computed from the counts (`Failed > Inconclusive > Skipped > Passed`);
+  a suite-level failure (e.g. `OneTimeTearDown`) still yields `Failed`. The job status stays `done`.
 ## [0.10.0] — 2026-08-05
 
 ### Added
