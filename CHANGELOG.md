@@ -6,6 +6,15 @@ All notable changes to this package are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.10.2] — 2026-10-11
+
+### Fixed
+- **`run_tests` no longer opens the blocking "Save modified scenes?" dialog on an EditMode run.**
+  `scenePolicy` (discard by default / save / abort) was applied only to PlayMode runs, but Test
+  Framework 1.6 (Unity 6) runs `SaveModifiedSceneTask` for EditMode too, so an EditMode run with a
+  dirty scene stalled the main thread — and the whole MCP channel — until a human clicked. The policy
+  now resolves dirty scenes before a run of either mode; abort messages say "Test run aborted".
+
 ## [0.10.1] — 2026-09-24
 
 ### Fixed

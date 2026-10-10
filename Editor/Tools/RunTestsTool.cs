@@ -46,7 +46,7 @@ namespace Shtl.Mcp.Tools
                 ["mode"] = new JObject { ["type"] = "string", ["description"] = "EditMode (default) or PlayMode." },
                 ["filter"] = new JObject { ["type"] = "string", ["description"] = "Optional regex over full test names (Test Runner groupNames)." },
                 ["assembly"] = new JObject { ["type"] = "string", ["description"] = "Optional test assembly name to limit the run, e.g. Shtl.Mcp.Editor.Tests." },
-                ["scenePolicy"] = new JObject { ["type"] = "string", ["description"] = "PlayMode only, for an unsaved active scene: discard (default, revert from disk) | save (write to disk) | abort. Modal-free — never opens a blocking 'Save scene?' dialog. Check sceneDirty via get_hierarchy to decide." }
+                ["scenePolicy"] = new JObject { ["type"] = "string", ["description"] = "Both modes, for an unsaved loaded scene: discard (default, revert from disk) | save (write to disk) | abort. Modal-free — never opens a blocking 'Save scene?' dialog. Check sceneDirty via get_hierarchy to decide." }
             }
         };
 
@@ -75,15 +75,13 @@ namespace Shtl.Mcp.Tools
                 f.assemblyNames = new[] { assembly };
             }
 
-            // PlayMode + грязная сцена → Unity Test Runner показал бы блокирующий «Save scene?» модал, который
-            // вешает MCP (главный поток в modal-loop). Решаем программно по политике (AC4.9 modal-free).
-            if (mode == "PlayMode")
+            // Грязная сцена → Test Runner показал бы блокирующий «Save scene?» модал, который вешает MCP (главный
+            // поток в modal-loop). SaveModifiedSceneTask стоит в списке задач обоих режимов (Test Framework 1.6,
+            // TaskList.GetTaskList). Решаем программно по политике (AC4.9 modal-free).
+            var dirtyError = ResolveDirtyScenes((string)args["scenePolicy"]);
+            if (dirtyError != null)
             {
-                var dirtyError = ResolveDirtyScenesForPlayMode((string)args["scenePolicy"]);
-                if (dirtyError != null)
-                {
-                    return new JObject { ["error"] = dirtyError };
-                }
+                return new JObject { ["error"] = dirtyError };
             }
 
             var jobId = _jobs.Create("run_tests");
@@ -119,10 +117,10 @@ namespace Shtl.Mcp.Tools
             };
         }
 
-        /// Готовит загруженные сцены к PlayMode-прогону без промптящего модала Test Runner'а (AC4.9).
+        /// Готовит загруженные сцены к тест-прогону без промптящего модала Test Runner'а (AC4.9).
         /// Imperative shell: собирает грязные сцены и выполняет save/discard; ветвление политики — в чистом
         /// DecideScenePolicy (тестируемо без Unity-сцены). Возвращает текст ошибки (отмена прогона) или null.
-        static string ResolveDirtyScenesForPlayMode(string scenePolicyArg)
+        internal static string ResolveDirtyScenes(string scenePolicyArg)
         {
             var dirty = new System.Collections.Generic.List<UnityEngine.SceneManagement.Scene>();
             for (int i = 0; i < SceneManager.sceneCount; i++)
@@ -154,7 +152,7 @@ namespace Shtl.Mcp.Tools
             }
             catch (Exception e)
             {
-                return $"PlayMode run aborted: failed to apply scenePolicy on '{scene.path}': {e.Message}";
+                return $"Test run aborted: failed to apply scenePolicy on '{scene.path}': {e.Message}";
             }
             return null;
         }
@@ -175,21 +173,21 @@ namespace Shtl.Mcp.Tools
             var policy = string.IsNullOrEmpty(scenePolicyArg) ? "discard" : scenePolicyArg.ToLowerInvariant();
             if (policy == "abort")
             {
-                return $"PlayMode run aborted (scenePolicy=abort): {dirtyCount} loaded scene(s) have unsaved " +
+                return $"Test run aborted (scenePolicy=abort): {dirtyCount} loaded scene(s) have unsaved " +
                     "changes. Resolve them (save_scene / open_scene) or pass scenePolicy='save'|'discard'.";
             }
             if (policy != "save" && policy != "discard")
             {
-                return $"PlayMode run aborted: unknown scenePolicy '{scenePolicyArg}' (expected save|discard|abort).";
+                return $"Test run aborted: unknown scenePolicy '{scenePolicyArg}' (expected save|discard|abort).";
             }
             if (dirtyCount > 1)
             {
-                return "PlayMode run aborted: multiple loaded scenes have unsaved changes — resolve them via " +
+                return "Test run aborted: multiple loaded scenes have unsaved changes — resolve them via " +
                     "save_scene/open_scene, or pass scenePolicy='abort'. (auto save/discard supports one scene)";
             }
             if (!firstHasPath)
             {
-                return $"PlayMode run aborted: the active scene is untitled with unsaved changes — can't {policy} " +
+                return $"Test run aborted: the active scene is untitled with unsaved changes — can't {policy} " +
                     "it silently. save_scene with a path first, then re-run.";
             }
 
