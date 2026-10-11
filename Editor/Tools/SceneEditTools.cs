@@ -201,7 +201,7 @@ namespace Shtl.Mcp.Tools
         static UnityEngine.Object ById(long id, out string error)
         {
             error = null;
-            var obj = EditorUtility.InstanceIDToObject((int)id);
+            var obj = SceneObjects.ObjectById(id);
             if (obj == null)
             {
                 error = "no object with instanceId " + id;
@@ -262,14 +262,14 @@ namespace Shtl.Mcp.Tools
                     comps.Add(new JObject
                     {
                         ["type"] = c.GetType().Name,
-                        ["instanceId"] = c.GetInstanceID(),
+                        ["instanceId"] = SceneObjects.IdOf(c),
                         ["properties"] = Props(c, maxDepth, ref budget)
                     });
                 }
                 return new JObject
                 {
                     ["path"] = SceneObjects.PathOf(go),
-                    ["instanceId"] = go.GetInstanceID(),
+                    ["instanceId"] = SceneObjects.IdOf(go),
                     ["components"] = comps,
                     ["truncated"] = budget <= 0
                 };
@@ -279,7 +279,7 @@ namespace Shtl.Mcp.Tools
             {
                 ["name"] = obj.name,
                 ["type"] = obj.GetType().Name,
-                ["instanceId"] = obj.GetInstanceID(),
+                ["instanceId"] = SceneObjects.IdOf(obj),
                 ["properties"] = Props(obj, maxDepth, ref budget),
                 ["truncated"] = budget <= 0
             };

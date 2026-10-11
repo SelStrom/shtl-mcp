@@ -421,3 +421,10 @@ AC3.5 дополнен формой результата `run_tests`: счётч
 и даже сьют из одних Inconclusive в Passed — измерено пробой). Сбой уровня сьюта (`OneTimeTearDown`,
 `FailCount 0`) остаётся Failed. Повод — гейт host-проекта «0 failed, 0 inconclusive» по `get_job`.
 EditMode 244/244 + сквозная проба 5 сценариев. Release 0.10.1.
+
+
+## [2026-10-11] forward | компиляция на Unity 6000.6 | unity-6000-6-entityid
+На 6000.6 `GetInstanceID`, `InstanceIDToObject` и приведения `EntityId <-> int` — `[Obsolete(error)]`
+(CS0619), пакет не компилировался. Перевод id собран в `SceneObjects.IdOf` / `ObjectById`: на
+`UNITY_6000_4_OR_NEWER` — 8 байт `EntityId` как `long`, иначе прежний InstanceID. Форма JSON та же.
+EditMode 244/244 на 6000.6.5f1 и 2022.3.62f3. Release 0.10.3.

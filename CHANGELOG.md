@@ -6,6 +6,16 @@ All notable changes to this package are documented here. Format follows
 
 ## [Unreleased]
 
+## [0.10.3] — 2026-10-11
+
+### Fixed
+- **The package compiles on Unity 6000.6.** `Object.GetInstanceID()`, `EditorUtility.InstanceIDToObject`
+  and the implicit `EntityId <-> int` conversions are `[Obsolete(error)]` there (CS0619), so a project on
+  6000.6 failed to compile the package and dropped into Safe Mode. On `UNITY_6000_4_OR_NEWER` object ids
+  are now the raw 8 bytes of `EntityId` (`EntityId.ToULong` / `FromULong`, `EditorUtility.EntityIdToObject`);
+  older editors keep the instance id. The JSON shape does not change: `instanceId` is still a number and
+  a numeric `target` round-trips on both — on 6000.6 it may just exceed the int range.
+
 ## [0.10.1] — 2026-09-24
 
 ### Fixed
