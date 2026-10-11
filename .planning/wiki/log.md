@@ -423,6 +423,13 @@ AC3.5 дополнен формой результата `run_tests`: счётч
 EditMode 244/244 + сквозная проба 5 сценариев. Release 0.10.1.
 
 
+## [2026-10-11] forward | run_tests: scenePolicy и для EditMode | run-tests-editmode-scene-policy
+AC4.9: guard грязной сцены в `run_tests` вызывался только для PlayMode, а Test Framework 1.6 (Unity 6)
+ставит `SaveModifiedSceneTask` и в EditMode-список — EditMode-прогон при грязной сцене открывал
+блокирующий «Save modified scenes?». Политика `scenePolicy` теперь применяется к обоим режимам.
+EditMode `TestProject~` 246/246 (+2 теста оболочки на реальной сцене). Release 0.10.2.
+
+
 ## [2026-10-11] forward | компиляция на Unity 6000.6 | unity-6000-6-entityid
 На 6000.6 `GetInstanceID`, `InstanceIDToObject` и приведения `EntityId <-> int` — `[Obsolete(error)]`
 (CS0619), пакет не компилировался. Перевод id собран в `SceneObjects.IdOf` / `ObjectById`: на

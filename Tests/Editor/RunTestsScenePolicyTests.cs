@@ -1,9 +1,13 @@
 using NUnit.Framework;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
 using Shtl.Mcp.Tools;
 
 namespace Shtl.Mcp.Editor.Tests
 {
-    /// Ветвление dirty-scene политики PlayMode-прогона (AC4.9 modal-free): discard(дефолт)/save/abort,
+    /// Ветвление dirty-scene политики тест-прогона (AC4.9 modal-free): discard(дефолт)/save/abort,
     /// untitled и multi-scene → отказ. Чистый DecideScenePolicy — без Unity-сцены.
     public class RunTestsScenePolicyTests
     {
@@ -77,6 +81,51 @@ namespace Shtl.Mcp.Editor.Tests
         {
             var err = RunTestsTool.DecideScenePolicy(1, false, "discard", out _, out _);
             StringAssert.Contains("untitled", err);
+        }
+    }
+
+    /// Оболочка ResolveDirtyScenes на реальной сохранённой сцене — то, что run_tests делает до старта прогона
+    /// любого режима.
+    public class RunTestsResolveDirtySceneTests
+    {
+        const string ScenePath = "Assets/ShtlRunTestsDirtyScene.unity";
+        const string ProbeName = "ShtlDirtyProbe";
+
+        [TearDown]
+        public void TearDown()
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            AssetDatabase.DeleteAsset(ScenePath);
+        }
+
+        static Scene SavedSceneWithUnsavedProbe()
+        {
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            Assert.IsTrue(EditorSceneManager.SaveScene(scene, ScenePath), "прекондиция: сцена сохранена");
+            new GameObject(ProbeName);
+            EditorSceneManager.MarkSceneDirty(scene);
+            Assert.IsTrue(scene.isDirty, "прекондиция: сцена грязная");
+            return scene;
+        }
+
+        [Test] public void DefaultPolicy_RevertsDirtySceneFromDisk()
+        {
+            SavedSceneWithUnsavedProbe();
+
+            Assert.IsNull(RunTestsTool.ResolveDirtyScenes(null));
+
+            Assert.IsFalse(SceneManager.GetSceneByPath(ScenePath).isDirty);
+            Assert.IsNull(GameObject.Find(ProbeName), "несохранённый объект отброшен");
+        }
+
+        [Test] public void Abort_KeepsDirtySceneAndReturnsError()
+        {
+            var scene = SavedSceneWithUnsavedProbe();
+
+            StringAssert.Contains("scenePolicy=abort", RunTestsTool.ResolveDirtyScenes("abort"));
+
+            Assert.IsTrue(scene.isDirty);
+            Assert.IsNotNull(GameObject.Find(ProbeName));
         }
     }
 }
