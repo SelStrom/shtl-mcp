@@ -119,7 +119,7 @@ namespace Shtl.Mcp.Editor.Tests
                 {
                     ["type"] = "ShtlM5ReflectSo",
                     ["method"] = "GetSeed",
-                    ["target"] = so.GetInstanceID()
+                    ["target"] = SceneObjects.IdOf(so)
                 });
                 Assert.IsTrue((bool)res["ok"], res.ToString());
                 Assert.AreEqual(7, (int)res["result"]);

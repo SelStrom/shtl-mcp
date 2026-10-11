@@ -104,6 +104,26 @@ namespace Shtl.Mcp.Tools
             }
         }
 
+        // В Unity 6000.6 InstanceID-API и приведения EntityId<->int помечены [Obsolete(error)] (CS0619):
+        // id отдаётся сырыми 8 байтами EntityId.
+        public static long IdOf(UnityEngine.Object obj)
+        {
+#if UNITY_6000_4_OR_NEWER
+            return (long)EntityId.ToULong(obj.GetEntityId());
+#else
+            return obj.GetInstanceID();
+#endif
+        }
+
+        public static UnityEngine.Object ObjectById(long id)
+        {
+#if UNITY_6000_4_OR_NEWER
+            return UnityEditor.EditorUtility.EntityIdToObject(EntityId.FromULong((ulong)id));
+#else
+            return UnityEditor.EditorUtility.InstanceIDToObject((int)id);
+#endif
+        }
+
         public static string PathOf(GameObject go)
         {
             var stack = new Stack<string>();
@@ -123,7 +143,7 @@ namespace Shtl.Mcp.Tools
                 ["name"] = go.name,
                 ["path"] = PathOf(go),
                 ["active"] = go.activeSelf,
-                ["instanceId"] = go.GetInstanceID()
+                ["instanceId"] = IdOf(go)
             };
             if (components)
             {

@@ -62,7 +62,7 @@ namespace Shtl.Mcp.Tools
             {
                 ["added"] = true,
                 ["type"] = type.FullName,
-                ["instanceId"] = comp.GetInstanceID(),
+                ["instanceId"] = SceneObjects.IdOf(comp),
                 ["target"] = SceneObjects.PathOf(go)
             };
         }

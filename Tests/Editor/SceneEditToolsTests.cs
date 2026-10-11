@@ -157,7 +157,7 @@ namespace Shtl.Mcp.Editor.Tests
             Assert.AreEqual(42, (int)byPath["properties"]["number"], byPath.ToString());
             Assert.AreEqual(SoPath, (string)byPath["assetPath"]);
 
-            var byId = new GetObjectTool().Invoke(new JObject { ["target"] = loaded.GetInstanceID() });
+            var byId = new GetObjectTool().Invoke(new JObject { ["target"] = SceneObjects.IdOf(loaded) });
             Assert.AreEqual(42, (int)byId["properties"]["number"], "target по instanceId");
         }
 

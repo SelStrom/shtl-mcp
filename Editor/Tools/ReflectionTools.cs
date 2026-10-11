@@ -39,7 +39,7 @@ namespace Shtl.Mcp.Tools
             if (result is UnityEngine.Object uo)
             {
                 // UnityEngine.Object не JSON-дружелюбен (циклы, нативные хэндлы) — компактный ref
-                return new JObject { ["name"] = uo.name, ["type"] = uo.GetType().Name, ["instanceId"] = uo.GetInstanceID() };
+                return new JObject { ["name"] = uo.name, ["type"] = uo.GetType().Name, ["instanceId"] = SceneObjects.IdOf(uo) };
             }
             try { return JToken.FromObject(result); }
             catch { return result.ToString(); }
